@@ -31,9 +31,10 @@
     cards.forEach((card)=>{
       const key=keyOf(card);
       if(!storyIndex[key]){
-        storyIndex[key]={storyKey:key,title:card.title||'Collected story',image:card.image||'',url:card.url||'',domain:card.domain||card.provider||'Collected source',searchQuery:card.searchQuery||'',collectedAt:card.collectedAt,paragraphs:buildParagraphs(card)};
+        storyIndex[key]={storyKey:key,title:card.title||'Collected story',image:card.image||'',url:card.url||'',domain:card.domain||card.provider||'Collected source',searchQuery:card.searchQuery||'',collectedAt:card.collectedAt,sourceFingerprint:card.extract||'',paragraphs:buildParagraphs(card)};
       }else{
         ['image','url','domain','searchQuery'].forEach(field=>{if(!storyIndex[key][field]&&card[field])storyIndex[key][field]=card[field]});
+        if(card.extract&&!storyIndex[key].sourceFingerprint){storyIndex[key].paragraphs=buildParagraphs(card);storyIndex[key].sourceFingerprint=card.extract}
       }
     });
     set(KEYS.stories,storyIndex);
