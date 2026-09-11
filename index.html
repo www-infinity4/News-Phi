@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>News Phi — Collected Intelligence</title>
+  <meta name="description" content="A living feed built from the orange cards collected across Infinity Phi searches." />
+  <meta name="theme-color" content="#080515" />
+  <link rel="canonical" href="https://www-infinity4.github.io/News-Phi/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="News Phi — Collected Intelligence" />
+  <meta property="og:description" content="Collected Infinity Phi cards become a reusable news and research feed." />
+  <meta property="og:url" content="https://www-infinity4.github.io/News-Phi/" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="News Phi home"><strong>NEWS</strong><span>φ</span></a>
+    <div class="sync-state"><i></i><span id="syncLabel">Reading shared cards</span></div>
+    <button class="refresh" id="refreshFeed" type="button">Refresh</button>
+  </header>
+
+  <main class="shell">
+    <section class="feed-head">
+      <p class="eyebrow">Infinity Phi collected intelligence</p>
+      <h1>Your selected cards,<br><em>flowing forward.</em></h1>
+      <p class="intro">Every orange card collected during a Phi search enters this feed once. Open a card for the full read or use it to begin a related line of news.</p>
+    </section>
+
+    <section class="feed-tools" aria-label="News feed controls">
+      <label class="feed-search">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2"/><path d="m15.5 15.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="sr-only">Filter collected cards</span>
+        <input id="feedSearch" type="search" placeholder="Filter the feed" autocomplete="off" />
+      </label>
+      <span class="card-count" id="cardCount">0 cards</span>
+    </section>
+
+    <section class="feed" id="feed" aria-live="polite">
+      <div class="loading-card">Synchronizing collected cards…</div>
+    </section>
+  </main>
+
+  <dialog class="story-dialog" id="storyDialog">
+    <button class="dialog-close" id="closeStory" type="button" aria-label="Close full card">×</button>
+    <article id="storyContent"></article>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
