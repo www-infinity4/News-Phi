@@ -55,6 +55,61 @@
     return sentences.length>520?`${sentences.slice(0,517).trim()}…`:sentences;
   }
 
+  function awardStarCoinShare(reference) {
+    const attemptId=`phi-share-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+    const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}};
+    const session=read('starquest_session',null);
+    const users=read('starquest_users',{});
+    const signedIn=session&&session.key&&users[session.key];
+    const wallet=signedIn||read('starquest_guest_profile_v1',{key:'__guest__',username:'Guest',tokens:0,shareCount:0,pendingShareCredits:0,shareEvents:[],ledger:[],watchHistory:[],watchPositions:{},unlockedContent:{}});
+    wallet.tokens=Math.max(0,Number(wallet.tokens)||0);
+    wallet.shareCount=Math.max(0,Number(wallet.shareCount)||0)+1;
+    wallet.pendingShareCredits=Math.max(0,Number(wallet.pendingShareCredits)||0)+1;
+    wallet.shareEvents=Array.isArray(wallet.shareEvents)?wallet.shareEvents:[];
+    wallet.ledger=Array.isArray(wallet.ledger)?wallet.ledger:[];
+    wallet.shareEvents.push({id:attemptId,attemptId,contentId:reference,method:'web_share_api',confirmed:true,verified:true,createdAt:Date.now()});
+    let awarded=0;
+    while(wallet.pendingShareCredits>=10){wallet.pendingShareCredits-=10;wallet.tokens+=1;awarded+=1}
+    wallet.ledger.push({id:`tx-${attemptId}`,type:awarded?'share_reward':'share_credit',amount:awarded,balance:wallet.tokens,pendingShareCredits:wallet.pendingShareCredits,reason:awarded?'Share reward: 10 completed shares':`Confirmed share receipt ${wallet.pendingShareCredits}/10`,referenceId:attemptId,createdAt:Date.now()});
+    wallet.shareEvents=wallet.shareEvents.slice(-250);wallet.ledger=wallet.ledger.slice(-500);
+    if(signedIn){users[session.key]=wallet;localStorage.setItem('starquest_users',JSON.stringify(users))}
+    else localStorage.setItem('starquest_guest_profile_v1',JSON.stringify(wallet));
+    window.dispatchEvent(new CustomEvent('starquest:share-progress',{detail:{progressToNextCoin:wallet.pendingShareCredits,awarded,balance:wallet.tokens}}));
+    return {progressToNextCoin:wallet.pendingShareCredits,awarded,balance:wallet.tokens};
+  }
+
+  async function shareStory(key) {
+    const story=state.storyIndex[key]; if(!story)return;
+    const params=new URLSearchParams({
+      sharedTitle:story.title||'Shared orange card',
+      sharedBody:(story.paragraphs||[]).join(' ').slice(0,1200),
+      sharedUrl:story.url||'',
+      sharedImage:story.image||'',
+      sharedDomain:story.domain||'',
+      sharedQuery:story.searchQuery||''
+    });
+    const shareUrl=`${location.origin}${location.pathname}?${params}#story=${encodeURIComponent(key)}`;
+    if(!navigator.share){try{await navigator.clipboard.writeText(shareUrl);alert('Card link copied. Open Android Share to earn 1/10 StarCoin.')}catch{}return}
+    try{
+      await navigator.share({title:story.title,text:excerpt(story),url:shareUrl});
+      const reward=awardStarCoinShare(shareUrl);
+      alert(reward.awarded?'Shared — 1 StarCoin completed!':`Shared — StarCoin progress ${reward.progressToNextCoin}/10`);
+    }catch(error){if(!error||error.name!=='AbortError')alert('Share did not complete.')}
+  }
+
+  function importSharedCard() {
+    const params=new URLSearchParams(location.search);
+    const title=params.get('sharedTitle'); if(!title)return '';
+    const card={title,extract:params.get('sharedBody')||'',url:params.get('sharedUrl')||'',image:params.get('sharedImage')||'',domain:params.get('sharedDomain')||'Shared card',searchQuery:params.get('sharedQuery')||'',collectedAt:new Date().toISOString()};
+    card.storyKey=keyOf(card);
+    const shared=get(KEYS.shared,[]);
+    const existing=shared.find(item=>keyOf(item)===card.storyKey);
+    if(existing)Object.assign(existing,card);else shared.unshift(card);
+    set(KEYS.shared,shared);
+    state=synchronize();
+    return card.storyKey;
+  }
+
   const feed=document.getElementById('feed');
   const count=document.getElementById('cardCount');
   const syncLabel=document.getElementById('syncLabel');
@@ -65,7 +120,7 @@
 
   function relatedUrl(story){
     const q=`${story.title} related research`;
-    return `https://www-infinity4.github.io/Omni-Phi/overview/?${new URLSearchParams({q,mode:'search'})}`;
+    return `https://www-infinity4.github.io/C13b0/phi?${new URLSearchParams({q,run:'1',cardTitle:story.title||'',cardBody:(story.paragraphs||[]).join(' ').slice(0,1200),source:story.url||''})}`;
   }
 
   function render(){
@@ -79,15 +134,17 @@
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article class="news-card"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${esc(story.domain)}</span>${story.searchQuery?`<span>From ${esc(story.searchQuery)}</span>`:''}</div><h2>${esc(story.title)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Open full card</button><a href="${relatedUrl(story)}">Build similar news</a></div></div></div></article>`;
+      return `<article class="news-card"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${esc(story.domain)}</span>${story.searchQuery?`<span>From ${esc(story.searchQuery)}</span>`:''}</div><h2>${esc(story.title)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Open full card</button><a href="${relatedUrl(story)}">Build similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share card · +1/10 ⭐</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
+    feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
   }
 
   function openStory(key){
     const story=state.storyIndex[key];
     if(!story)return;
-    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${esc(story.domain)}</span>${story.searchQuery?`<span>Collected from ${esc(story.searchQuery)}</span>`:''}</div><h2>${esc(story.title)}</h2>${(story.paragraphs||[]).map((paragraph,index)=>`<p class="${index===0?'lead':''}">${esc(paragraph)}</p>`).join('')}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open evidence source</a>`:''}<a href="${relatedUrl(story)}">Build similar news</a></div></div>`;
+    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${esc(story.domain)}</span>${story.searchQuery?`<span>Collected from ${esc(story.searchQuery)}</span>`:''}</div><h2>${esc(story.title)}</h2>${(story.paragraphs||[]).map((paragraph,index)=>`<p class="${index===0?'lead':''}">${esc(paragraph)}</p>`).join('')}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open evidence source</a>`:''}<a href="${relatedUrl(story)}">Build similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share card · +1/10 ⭐</button></div></div>`;
+    storyContent.querySelectorAll("[data-share]").forEach(button=>button.addEventListener("click",()=>shareStory(button.dataset.share)));
     if(location.hash!==`#story=${encodeURIComponent(key)}`)history.replaceState(null,'',`#story=${encodeURIComponent(key)}`);
     dialog.showModal();
   }
@@ -97,7 +154,8 @@
   dialog.addEventListener('click',event=>{if(event.target===dialog)closeStory()});
   search.addEventListener('input',render);
   document.getElementById('refreshFeed').addEventListener('click',()=>{state=synchronize();render()});
+  const importedKey=importSharedCard();
   render();
   const hashKey=location.hash.startsWith('#story=')?decodeURIComponent(location.hash.slice(7)):'';
-  if(hashKey)openStory(hashKey);
+  if(hashKey)openStory(state.storyIndex[hashKey]?hashKey:importedKey);
 })();
