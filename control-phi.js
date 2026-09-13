@@ -10,16 +10,17 @@
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
   const clean=(value,max=1200)=>String(value||'').replace(/\s+/g,' ').trim().slice(0,max);
   const pageMeta=(name)=>document.querySelector(`meta[property="${name}"],meta[name="${name}"]`)?.content||'';
-  const pageChannel=()=>clean(document.body?.dataset?.channel||pageMeta('application-name')||document.querySelector('h1')?.textContent||document.title.split(/[—|]/)[0],100);
+  const nowPlaying=()=>document.querySelector('[data-now-playing], #nowTitle, #programTitle, .now-title')?.textContent||'';
+  const pageChannel=()=>clean(document.body?.dataset?.channel||pageMeta('application-name')||pageMeta('og:site_name')||document.title.split(/[—|]/)[0]||document.querySelector('h1')?.textContent,100);
   const searchTerms=(payload)=>{
-    const raw=[payload.title,payload.text,payload.channel,document.querySelector('[data-now-playing]')?.textContent,pageMeta('description')].filter(Boolean).join(' ');
+    const raw=[payload.title,payload.text,payload.channel,nowPlaying(),pageMeta('description')].filter(Boolean).join(' ');
     const words=clean(raw,500).replace(/https?:\/\/\S+/g,' ').replace(/[^\p{L}\p{N}' -]+/gu,' ').split(/\s+/).filter(word=>word.length>2);
     return [...new Set(words)].slice(0,18).join(' ');
   };
   const describe=(payload,query)=>{
     const title=clean(payload.title||document.title||'Shared from Infinity TV',180);
     const channel=clean(payload.channel||pageChannel(),100);
-    const detail=clean(payload.text||pageMeta('description')||document.querySelector('[data-now-playing]')?.textContent,1000);
+    const detail=clean(payload.text||nowPlaying()||pageMeta('description'),1000);
     const lead=`${title} was shared${channel?` from ${channel}`:''}.`;
     const context=detail&&detail.toLowerCase()!==title.toLowerCase()?detail:`The share points to ${clean(payload.url||location.href,300)} and preserves the program or subject as a News Phi research starting point.`;
     const next=`News Phi prepared the research query “${query}” from the information available at the moment of sharing. Open this card to review the source and generate a deeper, source-based news search.`;
