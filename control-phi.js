@@ -38,7 +38,7 @@
     const newest=feed[0];
     if(newest&&newest.shareSignature===signature&&Date.now()-Date.parse(newest.collectedAt||0)<DEDUPE_WINDOW_MS)return newest;
     const id=`share-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2,9)}`;
-    const event={id,storyKey:id,title:payload.title||'Shared story',extract:describe(payload,query),url:payload.url,image:payload.image,domain:payload.channel||location.hostname,channel:payload.channel,searchQuery:query,collectedAt:now.toISOString(),kind:'shared-news',shareConfirmed:true,shareSignature:signature,source:'control-phi'};
+    const event={id,storyKey:id,title:payload.title||'Shared story',extract:describe(payload,query),url:payload.url,image:payload.image,domain:payload.channel||location.hostname,channel:payload.channel,searchQuery:query,collectedAt:now.toISOString(),kind:'shared-news',shareConfirmed:input.shareConfirmed!==false,shareMethod:clean(input.shareMethod||'web_share_api',60),shareSignature:signature,source:'control-phi'};
     feed.unshift(event);
     write(SHARE_KEY,feed.slice(0,MAX_SHARES));
     window.dispatchEvent(new CustomEvent('controlphi:shared',{detail:event}));
@@ -48,9 +48,29 @@
   function installShareBridge(){
     if(typeof navigator.share!=='function'||navigator.share.__controlPhi)return;
     const nativeShare=navigator.share.bind(navigator);
-    const wrapped=async(data={})=>{const result=await nativeShare(data);recordShare(data);return result};
+    const wrapped=async(data={})=>{const result=await nativeShare(data);recordShare({...data,shareConfirmed:true,shareMethod:'web_share_api'});return result};
     wrapped.__controlPhi=true;
     try{Object.defineProperty(navigator,'share',{configurable:true,value:wrapped})}catch{try{navigator.share=wrapped}catch{}}
+  }
+
+  function installShareLinkBridge(){
+    if(document.documentElement.dataset.controlPhiShareLinks==='1')return;
+    document.documentElement.dataset.controlPhiShareLinks='1';
+    document.addEventListener('click',event=>{
+      const anchor=event.target&&event.target.closest?event.target.closest('a[href]'):null;
+      if(!anchor)return;
+      let href='';
+      try{href=new URL(anchor.href,location.href).href}catch{return}
+      if(!/(twitter\.com\/intent\/tweet|x\.com\/intent\/post|facebook\.com\/sharer|linkedin\.com\/sharing|reddit\.com\/submit|mailto:)/i.test(href))return;
+      recordShare({title:document.title,text:nowPlaying()||pageMeta('description'),url:location.href,image:pageMeta('og:image')||pageMeta('twitter:image'),channel:pageChannel(),shareConfirmed:false,shareMethod:'share_link'});
+    },true);
+  }
+
+  function installCrossTabBridge(){
+    window.addEventListener('storage',event=>{
+      if(event.key!==SHARE_KEY)return;
+      window.dispatchEvent(new CustomEvent('controlphi:shared',{detail:{external:true}}));
+    });
   }
 
   function injectRemote(){
@@ -77,7 +97,9 @@
     function filter(){const term=input.value.trim().toLowerCase();nav.querySelectorAll('a').forEach(a=>a.hidden=!!term&&!a.textContent.toLowerCase().includes(term))}input.addEventListener('input',filter);
   }
 
-  window.ControlPhi={version:'1.1.0',recordShare,openNews:()=>location.assign(`${ROOT}News-Phi/`),shareFeed:()=>read(SHARE_KEY,[]).slice()};
+  window.ControlPhi={version:'1.2.0',recordShare,openNews:()=>location.assign(`${ROOT}News-Phi/`),shareFeed:()=>read(SHARE_KEY,[]).slice()};
   installShareBridge();
+  installShareLinkBridge();
+  installCrossTabBridge();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',injectRemote,{once:true});else injectRemote();
 })();
