@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "updated": "2026-09-13",
+  "channels": [
+    {"name":"BET","path":"BET"},
+    {"name":"Adventure TV","path":"Adventure-TV"},
+    {"name":"Discovery","path":"Discovery"},
+    {"name":"MTV","path":"MTV"},
+    {"name":"VH1","path":"VH1"},
+    {"name":"Trigger TV","path":"Trigger-TV"},
+    {"name":"CNN","path":"CNN"},
+    {"name":"Physics TV","path":"Physics-TV"},
+    {"name":"Nintendo TV","path":"Nintendo-TV"},
+    {"name":"FSN","path":"FSN"},
+    {"name":"TBS","path":"TBS"},
+    {"name":"Ozzy TV","path":"Ozzy-TV"},
+    {"name":"Nickelodeon","path":"Nickelodeon"},
+    {"name":"FX","path":"FX"},
+    {"name":"Chiller","path":"Chiller"},
+    {"name":"News Phi","path":"News-Phi"}
+  ]
+}
