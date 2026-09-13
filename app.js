@@ -3,7 +3,8 @@
     shared:'phiShared:collection:v1',
     stories:'phiShared:storyIndex:v1',
     omniProfile:'omniPhi:profile:v1',
-    omniResearch:'omniPhi:lastResearch:v1'
+    omniResearch:'omniPhi:lastResearch:v1',
+    controlShares:'controlPhi:shareFeed:v1'
   };
   const get=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
   const set=(key,value)=>localStorage.setItem(key,JSON.stringify(value));
@@ -15,8 +16,9 @@
     const shared=get(KEYS.shared,[]);
     const profile=get(KEYS.omniProfile,{collected:[]});
     const research=get(KEYS.omniResearch,null);
+    const controlShares=get(KEYS.controlShares,[]);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
-    const all=[...shared,...(profile.collected||[])];
+    const all=[...controlShares,...shared,...(profile.collected||[])];
     const merged=new Map();
     all.forEach((card)=>{
       const key=keyOf(card);
@@ -119,7 +121,7 @@
   let state=synchronize();
 
   function relatedUrl(story){
-    const q=`${story.title} related research`;
+    const q=story.searchQuery||`${story.title} related research`;
     return `https://www-infinity4.github.io/C13b0/phi?${new URLSearchParams({q,run:'1',cardTitle:story.title||'',cardBody:(story.paragraphs||[]).join(' ').slice(0,1200),source:story.url||''})}`;
   }
 
@@ -134,7 +136,7 @@
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article class="news-card"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${esc(story.domain)}</span>${story.searchQuery?`<span>From ${esc(story.searchQuery)}</span>`:''}</div><h2>${esc(story.title)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Open full card</button><a href="${relatedUrl(story)}">Build similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share card · +1/10 ⭐</button></div></div></div></article>`;
+      return `<article class="news-card" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${esc(story.domain)}</span>${story.searchQuery?`<span>Research: ${esc(story.searchQuery)}</span>`:''}</div><h2>${esc(story.title)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read news card</button><a href="${relatedUrl(story)}">Generate more news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share card · +1/10 ⭐</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
@@ -154,6 +156,7 @@
   dialog.addEventListener('click',event=>{if(event.target===dialog)closeStory()});
   search.addEventListener('input',render);
   document.getElementById('refreshFeed').addEventListener('click',()=>{state=synchronize();render()});
+  window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
   const importedKey=importSharedCard();
   render();
   const hashKey=location.hash.startsWith('#story=')?decodeURIComponent(location.hash.slice(7)):'';
