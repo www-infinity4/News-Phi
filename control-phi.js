@@ -6,6 +6,7 @@
   const ASSET_ROOT=new URL('.',scriptSource).href;
   const SHARE_KEY='controlPhi:shareFeed:v1';
   const MAX_SHARES=500;
+  const DEDUPE_WINDOW_MS=1500;
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
   const clean=(value,max=1200)=>String(value||'').replace(/\s+/g,' ').trim().slice(0,max);
@@ -26,18 +27,24 @@
     const next=`News Phi prepared the research query “${query}” from the information available at the moment of sharing. Open this card to review the source and generate a deeper, source-based news search.`;
     return [lead,context,next].join(' ');
   };
+  const signatureOf=(payload)=>[payload.url,payload.title,payload.channel].map(value=>clean(value,300).toLowerCase()).join('|');
+
   function recordShare(input={}){
     const now=new Date();
     const payload={title:clean(input.title||document.title,180),text:clean(input.text||'',1200),url:clean(input.url||location.href,700),image:clean(input.image||pageMeta('og:image')||pageMeta('twitter:image'),700),channel:clean(input.channel||pageChannel(),100)};
     const query=clean(input.searchQuery||searchTerms(payload)||payload.title,500);
-    const id=`share-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2,9)}`;
-    const event={id,storyKey:id,title:payload.title||'Shared story',extract:describe(payload,query),url:payload.url,image:payload.image,domain:payload.channel||location.hostname,channel:payload.channel,searchQuery:query,collectedAt:now.toISOString(),kind:'shared-news',shareConfirmed:true};
+    const signature=signatureOf(payload);
     const feed=read(SHARE_KEY,[]);
+    const newest=feed[0];
+    if(newest&&newest.shareSignature===signature&&Date.now()-Date.parse(newest.collectedAt||0)<DEDUPE_WINDOW_MS)return newest;
+    const id=`share-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2,9)}`;
+    const event={id,storyKey:id,title:payload.title||'Shared story',extract:describe(payload,query),url:payload.url,image:payload.image,domain:payload.channel||location.hostname,channel:payload.channel,searchQuery:query,collectedAt:now.toISOString(),kind:'shared-news',shareConfirmed:true,shareSignature:signature,source:'control-phi'};
     feed.unshift(event);
     write(SHARE_KEY,feed.slice(0,MAX_SHARES));
     window.dispatchEvent(new CustomEvent('controlphi:shared',{detail:event}));
     return event;
   }
+
   function installShareBridge(){
     if(typeof navigator.share!=='function'||navigator.share.__controlPhi)return;
     const nativeShare=navigator.share.bind(navigator);
@@ -45,6 +52,7 @@
     wrapped.__controlPhi=true;
     try{Object.defineProperty(navigator,'share',{configurable:true,value:wrapped})}catch{try{navigator.share=wrapped}catch{}}
   }
+
   function injectRemote(){
     if(document.getElementById('controlPhiButton'))return;
     const existingMenu=document.querySelector('details.channel-menu, details[data-channel-menu]');
@@ -68,7 +76,8 @@
     fetch(`${ASSET_ROOT}channels.json`,{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(data=>{nav.innerHTML=data.channels.map(item=>`<a href="${ROOT}${encodeURIComponent(item.path).replace(/%2F/g,'/')}/" data-name="${item.name.toLowerCase()}">${item.name}</a>`).join('');filter()}).catch(()=>{});
     function filter(){const term=input.value.trim().toLowerCase();nav.querySelectorAll('a').forEach(a=>a.hidden=!!term&&!a.textContent.toLowerCase().includes(term))}input.addEventListener('input',filter);
   }
-  window.ControlPhi={version:'1.0.0',recordShare,openNews:()=>location.assign(`${ROOT}News-Phi/`)};
+
+  window.ControlPhi={version:'1.1.0',recordShare,openNews:()=>location.assign(`${ROOT}News-Phi/`),shareFeed:()=>read(SHARE_KEY,[]).slice()};
   installShareBridge();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',injectRemote,{once:true});else injectRemote();
 })();
