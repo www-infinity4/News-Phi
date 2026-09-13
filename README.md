@@ -8,6 +8,7 @@ News Phi is the reusable reading feed for cards collected across Infinity Phi se
 - `phiShared:storyIndex:v1` stores each built full-card story by stable source URL, source ID, or normalized title.
 - `omniPhi:profile:v1` remains supported and is migrated automatically for earlier collections.
 - `omniPhi:lastResearch:v1` enriches older saved cards with current source text and imagery when available.
+- `controlPhi:shareFeed:v1` receives one unique article seed for every completed channel share.
 
 Because `Omni-Phi` and `News-Phi` are served from the same `www-infinity4.github.io` origin, they can use the same browser memory across repository paths.
 
@@ -20,3 +21,5 @@ Because `Omni-Phi` and `News-Phi` are served from the same `www-infinity4.github
 5. **Build similar news** sends the story subject back into Omni Phi as a related search.
 
 Stories are deduplicated and built once, then reused on later feed visits.
+
+Control Phi share events intentionally retain their unique event ID, so repeated shares create separate News Phi cards. Each card carries a query assembled from the shared title, description, current channel/program context, and source URL.
