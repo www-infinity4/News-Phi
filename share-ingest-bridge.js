@@ -12,16 +12,22 @@
     if(url.href!==location.href)history.replaceState({},'',`${url.pathname}${url.search}${url.hash}`);
   }
 
-  function importIncomingShare(){
+  async function importIncomingShare(){
     if(!window.PhiIngest)return null;
     const params=new URLSearchParams(location.search);
     if(!params.has('shareTarget'))return null;
-    const record=window.PhiIngest.ingestShareTarget(params);
+    const record=await window.PhiIngest.ingestShareTarget(params);
     cleanShareParams();
     if(!record)return null;
-    if(record.readyForCard)status('Shared content indexed into News Phi');
+    if(record.readyForCard){status('Shared content indexed into News Phi');location.reload();}
     else status('Link queued until its published content is resolved');
     return record;
+  }
+
+  async function resolveQueuedLinks(){
+    if(!window.PhiIngest?.resolvePending)return;
+    const resolved=await window.PhiIngest.resolvePending();
+    if(resolved){status(`${resolved} copied link${resolved===1?'':'s'} turned into News Phi stories`);location.reload();}
   }
 
   function installPasteButton(){
@@ -53,6 +59,7 @@
     tools.appendChild(button);
   }
 
-  importIncomingShare();
+  importIncomingShare().catch((error)=>status(error?.message||'Shared item could not be indexed'));
+  resolveQueuedLinks().catch(()=>{});
   installPasteButton();
 })();
