@@ -13,6 +13,7 @@
     const parts=[];
     if(group.views)parts.push(`${group.views} view${group.views===1?"":"s"}`);
     if(group.searches)parts.push(`${group.searches} search${group.searches===1?"":"es"}`);
+    if(group.clicks)parts.push(`${group.clicks} tracked click${group.clicks===1?"":"s"}`);
     if(group.shares)parts.push(`${group.shares} completed share${group.shares===1?"":"s"}`);
     return parts.join(" · ")||"interest signal";
   }
@@ -25,9 +26,9 @@
     const engagement=summarizeCounts(group);
     const title=isSearch?`Explore: ${subject}`:subject;
     const context=isSearch
-      ?`You searched Omni TV for “${subject}”. News Phi saved that search as a research path so it can grow into background, people, history, technology, related ideas, and current developments instead of disappearing after one search.`
-      :`“${subject}” surfaced in your Omni TV activity${channel?` on ${channel}`:""}. News Phi saved it as a research starting point so you can move from watching into useful background, people, history, technology, related ideas, and current developments connected to the subject.`;
-    const personalization=`This topic currently reflects ${engagement}. Repeated views bring a subject back toward the top, searches add new directions, and completed shares count as a stronger signal that the topic is worth expanding.`;
+      ?`You searched the Infinity Phi network for “${subject}”. News Phi saved that search as a research path so it can grow into background, people, history, technology, related ideas, and current developments instead of disappearing after one search.`
+      :`“${subject}” surfaced in your Infinity activity${channel?` on ${channel}`:""}. News Phi saved it as a research starting point so you can move from watching or reading into useful background, people, history, technology, related ideas, and current developments connected to the subject.`;
+    const personalization=`This topic currently reflects ${engagement}. Repeated views bring a subject back toward the top, searches add new directions, tracked clicks strengthen what you actually followed, and completed shares count as the strongest signal that the topic is worth expanding.`;
     const query=isSearch?subject:`${subject}${channel?` ${channel}`:""} background history technology people current developments`;
     return {
       storyKey:`omni-interest:${slug(group.topicKey)}`,
@@ -35,12 +36,12 @@
       extract:`${context} ${personalization}`,
       image:latest.image||"",
       url:latest.url||"https://www-infinity4.github.io/Omni-TV/",
-      domain:isSearch?"Omni TV search":`Omni TV${channel?` · ${channel}`:""}`,
-      provider:"Omni TV",
+      domain:isSearch?"Infinity search":`Infinity network${channel?` · ${channel}`:""}`,
+      provider:"News Phi interest engine",
       searchQuery:query,
       collectedAt:new Date(group.lastAt||Date.now()).toISOString(),
       generatedBy:GENERATED_BY,
-      interestScore:group.views+(group.searches*2)+(group.shares*4),
+      interestScore:group.views+(group.searches*2)+(group.clicks*3)+(group.shares*4),
       interactionSummary:engagement
     };
   }
@@ -56,11 +57,12 @@
       if(!topicKey)return;
       let group=groups.get(topicKey);
       if(!group){
-        group={topicKey,type:kind==="search"?"search":"program",views:0,searches:0,shares:0,lastAt:0,latest:signal};
+        group={topicKey,type:kind==="search"?"search":"program",views:0,searches:0,clicks:0,shares:0,lastAt:0,latest:signal};
         groups.set(topicKey,group);
       }
       const hits=Math.max(1,Number(signal.hits)||1);
       if(kind==="share")group.shares+=hits;
+      else if(kind==="click")group.clicks+=hits;
       else if(kind==="search")group.searches+=hits;
       else group.views+=hits;
       const at=Number(signal.lastAt||Date.parse(signal.collectedAt||signal.createdAt||"")||0);
@@ -69,7 +71,6 @@
 
     const generated=[...groups.values()].map(buildCard).sort((a,b)=>String(b.collectedAt).localeCompare(String(a.collectedAt)));
     const shared=read(SHARED_KEY,[]);
-    const generatedMap=new Map(generated.map(card=>[card.storyKey,card]));
     const merged=[];
     const seen=new Set();
 
