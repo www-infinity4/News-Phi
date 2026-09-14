@@ -3,7 +3,7 @@
 
   const KEYS = {
     queue: 'controlPhi:ingestQueue:v1',
-    shared: 'phiShared:collection:v1',
+    retrieval: 'newsPhi:retrievalQueue:v2',
     config: 'controlPhi:searchConfig:v1'
   };
 
@@ -61,6 +61,16 @@
     return clean(value).replace(/https?:\/\/[^\s<>'\"]+/gi, ' ').replace(/\s+/g, ' ').trim();
   }
 
+  function urlTopic(value) {
+    try {
+      const url = new URL(value);
+      return decodeURIComponent(`${url.hostname.replace(/^www\./, '')} ${url.pathname}`)
+        .replace(/[^a-z0-9]+/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    } catch { return ''; }
+  }
+
   function titleFor(input, body, identity) {
     const supplied = clean(input.title);
     if (supplied && !/^https?:\/\//i.test(supplied) && supplied.length > 5) return supplied.slice(0, 180);
@@ -113,36 +123,32 @@
       collectedAt: new Date().toISOString(),
       terms: termsFrom(`${title} ${body}`, 10),
       questions: questionsFor(title, body),
-      searchText: clean(`${title} ${body}`),
+      searchText: clean(`${title} ${body} ${urlTopic(sourceUrl)}`),
       needsResolution: Boolean(sourceUrl && !meaningful),
-      readyForCard: meaningful
+      readyForCard: meaningful || Boolean(sourceUrl && !identity)
     };
   }
 
   function publishCard(record) {
     if (!record || !record.readyForCard) return false;
-    const cards = safeJson(KEYS.shared, []);
-    const card = {
+    const jobs = safeJson(KEYS.retrieval, []);
+    const job = {
       id: record.id,
-      storyKey: record.id,
-      title: record.title,
-      extract: record.text,
-      body: record.text,
-      url: record.url,
-      domain: record.x ? `X / ${record.authorName || `@${record.x.author}`}` : 'Shared research',
-      provider: record.x ? 'X' : 'Shared research',
-      searchQuery: record.searchText,
-      questions: record.questions,
+      jobKey: `share:${hash(`${record.url}|${record.text}`)}`,
+      kind: 'share',
+      subject: record.title,
+      query: record.searchText,
+      sourceUrl: record.url,
       collectedAt: record.collectedAt,
-      ingestType: record.type,
-      sourceFingerprint: hash(`${record.url}|${record.text}`)
+      indexedText: record.text,
+      status: 'indexed'
     };
-    const existing = cards.findIndex((item) => item.sourceFingerprint === card.sourceFingerprint || (item.url && item.url === card.url && item.extract === card.extract));
-    if (existing >= 0) cards[existing] = { ...cards[existing], ...card };
-    else cards.unshift(card);
-    saveJson(KEYS.shared, cards.slice(0, 500));
-    global.dispatchEvent(new CustomEvent('phi:ingested', { detail: card }));
-    return card;
+    const existing = jobs.findIndex((item) => item.jobKey === job.jobKey);
+    if (existing >= 0) jobs[existing] = { ...jobs[existing], ...job };
+    else jobs.unshift(job);
+    saveJson(KEYS.retrieval, jobs.slice(0, 500));
+    global.dispatchEvent(new CustomEvent('phi:ingested', { detail: job }));
+    return job;
   }
 
   function enqueue(record) {

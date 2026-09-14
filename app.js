@@ -116,10 +116,7 @@
     const headline=titleFromCard(card);
     const kind=detectKind(card,headline);
     const facts=usefulSentences(card.extract||card.body||'');
-    const fallback=kind==='screen'
-      ? `${headline} is the subject of this saved viewing trail. News Phi is building context around the work itself—its story, production, people, reception, and connected subjects—rather than treating the share action as the story.`
-      : `${headline} is the subject of this saved interest trail. News Phi is building the story around the subject itself and will add source-backed context as it becomes available.`;
-    const standfirst=facts.slice(0,2).join(' ')||fallback;
+    const standfirst=facts.slice(0,2).join(' ');
     const paragraphs=paragraphize(facts.length?facts:[standfirst],4);
     return {
       ...previous,
@@ -128,7 +125,7 @@
       title:headline,
       headline,
       kind,
-      image:card.image||previous.image||'',
+      image:card.imageVerified?(card.image||previous.image||''):'',
       url:card.url||previous.url||'',
       domain:card.domain||card.provider||card.channel||previous.domain||'Infinity interest signal',
       channel:card.channel||previous.channel||'',
@@ -137,19 +134,24 @@
       standfirst,
       paragraphs,
       similarQuery:similarQueryFor(card,headline,kind),
-      sources:Array.isArray(previous.sources)?previous.sources:[],
-      enriched:Boolean(previous.enriched),
+      sources:Array.isArray(card.sources)?card.sources:(Array.isArray(previous.sources)?previous.sources:[]),
+      enriched:Boolean(card.sourceBacked||previous.enriched),
       sourceFingerprint:card.extract||previous.sourceFingerprint||''
     };
+  }
+
+  function isVisibleCard(card){
+    if(!card||card.generatedBy==='news-phi-interest-bridge'||card.ingestType)return false;
+    if(card.kind==='share'&&!card.sourceBacked)return false;
+    return Boolean(clean(card.title)&&clean(card.extract||card.body));
   }
 
   function synchronize(){
     const shared=get(KEYS.shared,[]);
     const profile=get(KEYS.omniProfile,{collected:[]});
     const research=get(KEYS.omniResearch,null);
-    const controlShares=get(KEYS.controlShares,[]);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
-    const all=[...controlShares,...shared,...(profile.collected||[])];
+    const all=[...shared,...(profile.collected||[])].filter(isVisibleCard);
     const merged=new Map();
 
     all.forEach(card=>{
@@ -205,7 +207,9 @@
     renderStoryCardState(key);
     try{
       const query=story.kind==='screen'?`${story.headline} film`:story.similarQuery||story.headline;
-      const found=rankSources(story,await wikiSearch(query)).filter(source=>overlap(`${source.title} ${source.excerpt}`,`${story.headline} ${story.searchQuery}`)>0);
+      const target=`${story.headline} ${story.searchQuery}`;
+      const minimum=importantTerms(target).length>1?2:1;
+      const found=rankSources(story,await wikiSearch(query)).filter(source=>overlap(`${source.title} ${source.excerpt}`,target)>=minimum);
       if(found.length){
         const sourceSentences=[];
         found.slice(0,3).forEach(source=>{
@@ -218,7 +222,9 @@
         story.standfirst=standfirst;
         story.paragraphs=paragraphs.length?paragraphs:[standfirst];
         story.sources=found.slice(0,4);
-        if(!story.image)story.image=found.find(source=>source.image)?.image||'';
+        const imageSource=found.find(source=>source.image&&overlap(`${source.title} ${source.excerpt}`,target)>=minimum);
+        story.image=imageSource?.image||'';
+        story.imageVerified=Boolean(imageSource);
         story.enriched=true;
       }
     }catch(_){}
@@ -354,7 +360,7 @@
     if(!story)return;
     dialog.dataset.storyKey=key;
     const sources=(story.sources||[]).map(source=>`<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a><span>${esc(source.provider||'Source')}</span></li>`).join('');
-    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open original signal</a>`:''}<a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
+    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
     storyContent.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
     if(location.hash!==`#story=${encodeURIComponent(key)}`)history.replaceState(null,'',`#story=${encodeURIComponent(key)}`);
     if(!rerender)dialog.showModal();

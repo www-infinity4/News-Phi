@@ -19,7 +19,7 @@
     const record=await window.PhiIngest.ingestShareTarget(params);
     cleanShareParams();
     if(!record)return null;
-    if(record.readyForCard){status('Shared content indexed into News Phi');location.reload();}
+    if(record.readyForCard){status('Shared material indexed; building a source-backed card');window.dispatchEvent(new Event('newsphi:run-retrieval'));}
     else status('Link queued until its published content is resolved');
     return record;
   }
@@ -27,7 +27,7 @@
   async function resolveQueuedLinks(){
     if(!window.PhiIngest?.resolvePending)return;
     const resolved=await window.PhiIngest.resolvePending();
-    if(resolved){status(`${resolved} copied link${resolved===1?'':'s'} turned into News Phi stories`);location.reload();}
+    if(resolved){status(`${resolved} copied link${resolved===1?'':'s'} indexed; building sourced cards`);window.dispatchEvent(new Event('newsphi:run-retrieval'));}
   }
 
   function installPasteButton(){
@@ -45,8 +45,8 @@
       try{
         const record=await window.PhiIngest.ingestClipboard();
         if(record.readyForCard){
-          status('Clipboard content indexed');
-          location.reload();
+          status('Clipboard material indexed; building a source-backed card');
+          window.dispatchEvent(new Event('newsphi:run-retrieval'));
           return;
         }
         status('Clipboard link queued for content resolution');
