@@ -40,7 +40,7 @@
   function rankSources(job,sources){
     const target=searchTerms(job).join(' '),seen=new Set();
     const minimum=searchTerms(job).length>1?2:1;
-    return sources.flatMap(source=>{const key=source.url||`${source.provider}:${source.title}`;if(!source.title||!source.excerpt||seen.has(key))return [];seen.add(key);const score=overlap(`${source.title} ${source.excerpt}`,target);return score>=minimum?[{...source,_score:score}]:[]}).sort((a,b)=>b._score-a._score).map(({_score,...source})=>source);
+    return sources.flatMap(source=>{const key=source.url||`${source.provider}:${source.title}`;if(!source.title||!source.excerpt||seen.has(key)||Boolean(job.excludedSourceUrl&&source.url===job.excludedSourceUrl))return [];seen.add(key);const score=overlap(`${source.title} ${source.excerpt}`,target);return score>=minimum?[{...source,_score:score}]:[]}).sort((a,b)=>b._score-a._score).map(({_score,...source})=>source);
   }
   const rawSignalCard=card=>!card||card.generatedBy==='news-phi-interest-bridge'||Boolean(card.ingestType)||(/^phi-/.test(card.storyKey||'')&&!card.sourceBacked);
 
@@ -54,7 +54,7 @@
     const terms=searchTerms(job),query=terms.join(' ');if(query.length<3)return null;
     const settled=await Promise.allSettled([wikipedia(query),duckDuckGo(query),crossref(query),searxng(query)]),sources=rankSources(job,settled.flatMap(result=>result.status==='fulfilled'?result.value:[])).slice(0,5);if(!sources.length)return null;
     const lead=sources[0],imageSource=sources.find(source=>source.image&&overlap(`${source.title} ${source.excerpt}`,query)>=Math.min(2,terms.length));
-    return {id:`retrieved-${hash(job.jobKey||query)}`,storyKey:`retrieved:${hash(job.jobKey||query)}`,kind:job.kind,title:lead.title,extract:sources.slice(0,3).map(source=>clip(source.excerpt)).filter(Boolean).join(' '),url:lead.url,domain:lead.provider,provider:lead.provider,publishedAt:lead.publishedAt||'',collectedAt:job.collectedAt||new Date().toISOString(),searchQuery:query,sources,image:imageSource?.image||'',imageVerified:Boolean(imageSource),sourceBacked:true,retrievalVersion:VERSION};
+    return {id:`retrieved-${hash(job.jobKey||query)}`,storyKey:`retrieved:${hash(job.jobKey||query)}`,kind:job.kind,title:lead.title,extract:sources.slice(0,3).map(source=>clip(source.excerpt)).filter(Boolean).join(' '),url:lead.url,domain:lead.provider,provider:lead.provider,publishedAt:lead.publishedAt||'',collectedAt:job.collectedAt||new Date().toISOString(),searchQuery:query,originQuery:job.originQuery||'',sources,image:imageSource?.image||'',imageVerified:Boolean(imageSource),sourceBacked:true,retrievalVersion:VERSION};
   }
 
   let running=false;
