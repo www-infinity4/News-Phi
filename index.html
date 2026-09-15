@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>News Phi — Collected Intelligence</title>
-  <meta name="description" content="A living feed built from Infinity Phi cards plus the programs, searches, tracked clicks, and completed shares you choose across the Infinity network." />
+  <meta name="description" content="A living feed built only from stories and cards you explicitly add to News Phi." />
   <meta name="theme-color" content="#080515" />
   <link rel="canonical" href="https://www-infinity4.github.io/News-Phi/" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="News Phi — Collected Intelligence" />
-  <meta property="og:description" content="Your selected cards, program views, searches, tracked share-link clicks, and completed shares become reusable news and research paths." />
+  <meta property="og:description" content="Your explicitly selected cards become reusable news and research paths. Searches and views do not create stories by themselves." />
   <meta property="og:url" content="https://www-infinity4.github.io/News-Phi/" />
   <meta name="twitter:card" content="summary" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -19,7 +19,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="./" aria-label="News Phi home"><strong>NEWS</strong><span>φ</span></a>
-    <div class="sync-state"><i></i><span id="syncLabel">Reading shared cards</span></div>
+    <div class="sync-state"><i></i><span id="syncLabel">Reading added stories</span></div>
     <button class="refresh" id="refreshFeed" type="button">Refresh</button>
   </header>
 
@@ -27,7 +27,7 @@
     <section class="feed-head">
       <p class="eyebrow">Infinity Phi collected intelligence</p>
       <h1>Your interests,<br><em>flowing forward.</em></h1>
-      <p class="intro">News Phi grows from what you actually explore. Tapping a program records a view signal, searches add subjects you want to investigate, tracked links record what you actually followed, and completed shares count as the strongest signal. News Phi turns those choices into reusable story cards and brings repeated interests back toward the top, giving you an educational feed shaped by your own viewing and research instead of a generic list.</p>
+      <p class="intro">News Phi only builds from cards and stories you explicitly add. Searches, page views, tracked clicks, and background interest signals can inform the wider system, but they do not create News Phi stories on their own. After you add a story, News Phi can expand it, read it, share it, or build similar news when you choose.</p>
     </section>
 
     <section class="feed-tools" aria-label="News feed controls">
@@ -40,7 +40,7 @@
     </section>
 
     <section class="feed" id="feed" aria-live="polite">
-      <div class="loading-card">Synchronizing collected cards…</div>
+      <div class="loading-card">Synchronizing added stories…</div>
     </section>
   </main>
 
@@ -54,10 +54,9 @@
   <script src="news-wallet-bridge.js?v=20260914-wallet1"></script>
   <script src="phi-ingest.js?v=20260914-index-only1"></script>
   <script src="share-ingest-bridge.js?v=20260914-index-only1"></script>
-  <script src="interest-feed-bridge.js?v=20260914-index-only1"></script>
-  <script src="app.js?v=20260914-wallet1"></script>
+  <script src="manual-story-gate.js?v=20260915-explicit-add1"></script>
+  <script src="app.js?v=20260915-explicit-add1"></script>
   <script src="scroll-stability.js?v=20260914-anchor1"></script>
-  <script src="retrieval-upgrade.js?v=20260914-source-publish1"></script>
-  <script src="news-interactions.js?v=20260914-scroll-fix2"></script>
+  <script src="news-interactions.js?v=20260915-explicit-add1"></script>
 </body>
 </html>
