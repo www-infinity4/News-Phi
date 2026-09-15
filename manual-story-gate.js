@@ -10,6 +10,9 @@
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
   const clean=value=>String(value??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
   const keyOf=(card)=>card?.storyKey||card?.url||card?.id||String(card?.title||'card').toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  const sports=card=>/\b(baseball|mlb|home run|home runs|batting|pitcher|pitching|yankees|nba|nfl|nhl|football|basketball|hockey|sports)\b/i.test(`${card?.title||''} ${card?.searchQuery||''} ${card?.extract||''}`);
+  const riskyLegacySentence=sentence=>/\d/.test(sentence)||/\b(leader|leaders|record|records|most|first|only|largest|highest|lowest|greatest|all-time|ever|unprecedented)\b/i.test(sentence);
+  const safeLegacySportsText=text=>clean(text).split(/(?<=[.!?])\s+/).map(clean).filter(sentence=>sentence.length>=24&&!riskyLegacySentence(sentence)).slice(0,6).join(' ');
 
   // Repair source metadata BEFORE masking Omni reads on News Phi. This restores
   // images immediately and, when current Omni research still has the original
@@ -39,6 +42,10 @@
       card.aiCardExtract=card.aiCardExtract||card.extract||'';
       card.extract=card.sourceExtract;
       repaired=true;
+    }else if(card?.url&&sports(card)&&!card?.sourceExtract){
+      const sanitized=safeLegacySportsText(card.extract||card.body||'');
+      const replacement=sanitized||'This saved sports card predates source-locked News Phi. Open the primary source for verified statistics; unsourced saved statistics are not republished as facts.';
+      if(card.extract!==replacement){card.aiCardExtract=card.aiCardExtract||card.extract||'';card.extract=replacement;card.legacyStatsSanitized=true;repaired=true}
     }
   });
   if(repaired)write(SHARED,beforeRepair);
@@ -85,5 +92,5 @@
     return originalGetItem.call(this,key);
   };
 
-  window.NewsPhiManualStoryGate=Object.freeze({enabled:true,rule:'explicit-add-only+source-truth+preserve-images'});
+  window.NewsPhiManualStoryGate=Object.freeze({enabled:true,rule:'explicit-add-only+source-truth+preserve-images+legacy-sports-stat-sanitize'});
 })();
