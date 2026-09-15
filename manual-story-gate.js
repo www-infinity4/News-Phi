@@ -8,7 +8,40 @@
 
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
+  const clean=value=>String(value??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
   const keyOf=(card)=>card?.storyKey||card?.url||card?.id||String(card?.title||'card').toLowerCase().replace(/[^a-z0-9]+/g,'-');
+
+  // Repair source metadata BEFORE masking Omni reads on News Phi. This restores
+  // images immediately and, when current Omni research still has the original
+  // evidence, replaces generated card prose with the actual source extract.
+  const research=read(OMNI_RESEARCH,null);
+  const liveSources=Array.isArray(research?.sources)?research.sources:[];
+  const byUrl=new Map(liveSources.filter(source=>source?.url).map(source=>[source.url,source]));
+  const byId=new Map(liveSources.filter(source=>source?.id).map(source=>[source.id,source]));
+  const beforeRepair=read(SHARED,[]);
+  let repaired=false;
+  beforeRepair.forEach(card=>{
+    const live=byUrl.get(card?.url)||byId.get(card?.id)||null;
+    if(card?.image&&!card.imageVerified){card.imageVerified=true;repaired=true}
+    if(card?.url&&!card.sourceBacked){card.sourceBacked=true;repaired=true}
+    if(live){
+      const sourceTitle=clean(live.sourceTitle||live.title);
+      const sourceExtract=clean(live.sourceExtract||(!live.aiGenerated?live.extract:''));
+      if(sourceTitle&&card.sourceTitle!==sourceTitle){card.sourceTitle=sourceTitle;repaired=true}
+      if(sourceExtract){
+        card.sourceExtract=sourceExtract;
+        if(card.extract!==sourceExtract){card.aiCardExtract=card.aiCardExtract||card.extract||'';card.extract=sourceExtract;repaired=true}
+      }
+      if(live.image){card.image=live.image;card.imageVerified=true;repaired=true}
+      card.sourceBacked=true;
+      card.aiGenerated=Boolean(live.aiGenerated);
+    }else if(card?.sourceExtract&&card.extract!==card.sourceExtract){
+      card.aiCardExtract=card.aiCardExtract||card.extract||'';
+      card.extract=card.sourceExtract;
+      repaired=true;
+    }
+  });
+  if(repaired)write(SHARED,beforeRepair);
 
   // News Phi is manual-first. Searches, views, shares, and background retrievals
   // may be useful signals elsewhere, but they are not permission to create a story.
@@ -52,5 +85,5 @@
     return originalGetItem.call(this,key);
   };
 
-  window.NewsPhiManualStoryGate=Object.freeze({enabled:true,rule:'explicit-add-only'});
+  window.NewsPhiManualStoryGate=Object.freeze({enabled:true,rule:'explicit-add-only+source-truth+preserve-images'});
 })();
