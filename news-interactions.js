@@ -189,41 +189,19 @@
     addButton(storyContent.querySelector('.card-actions'),key,storyContent);
   }
 
-  let anchor={key:'',top:0};
-  let captureQueued=false;
-  function captureAnchor(){
-    captureQueued=false;
-    const threshold=128;
-    const cards=[...feed.querySelectorAll('article[data-story-card]')];
-    const visible=cards.find(card=>card.getBoundingClientRect().bottom>threshold);
-    if(visible)anchor={key:visible.dataset.storyCard||'',top:visible.getBoundingClientRect().top};
-  }
-  function queueCapture(){if(captureQueued)return;captureQueued=true;requestAnimationFrame(captureAnchor)}
-  window.addEventListener('scroll',queueCapture,{passive:true});
-  window.addEventListener('resize',queueCapture,{passive:true});
-
-  let restoring=false;
-  const feedObserver=new MutationObserver(()=>{
-    if(restoring)return;
-    const before={...anchor};
-    enhanceFeed();
+  let enhanceQueued=false;
+  function queueEnhanceFeed(){
+    if(enhanceQueued)return;
+    enhanceQueued=true;
     requestAnimationFrame(()=>{
-      if(before.key){
-        const selector=`article[data-story-card="${CSS.escape(before.key)}"]`;
-        const same=feed.querySelector(selector);
-        if(same){
-          const delta=same.getBoundingClientRect().top-before.top;
-          if(Number.isFinite(delta)&&Math.abs(delta)>1){
-            restoring=true;
-            window.scrollBy({top:delta,left:0,behavior:'auto'});
-            requestAnimationFrame(()=>{restoring=false;captureAnchor()});
-            return;
-          }
-        }
-      }
-      captureAnchor();
+      enhanceQueued=false;
+      enhanceFeed();
     });
-  });
+  }
+
+  // Only add News Phi controls when the feed changes. Never move the user's
+  // scroll position in response to asynchronous card/image/source updates.
+  const feedObserver=new MutationObserver(queueEnhanceFeed);
   feedObserver.observe(feed,{childList:true,subtree:true});
 
   if(storyContent){
@@ -233,5 +211,4 @@
 
   enhanceFeed();
   enhanceDialog();
-  captureAnchor();
 })();
