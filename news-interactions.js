@@ -5,6 +5,9 @@
   const STORIES_KEY='phiShared:storyIndex:v2';
   const CONFIG_KEY='controlPhi:searchConfig:v1';
   const ROUND_KEY='newsPhi:similarRounds:v1';
+  const params=new URLSearchParams(location.search);
+  const AUTO_SIMILAR=params.get('buildSimilar')==='1';
+  const AUTO_STORY_KEY=(()=>{try{const match=location.hash.match(/^#story=(.*)$/);return match?decodeURIComponent(match[1]):''}catch{return''}})();
   const STOP=new Set(['about','after','again','also','and','are','because','before','being','from','have','into','more','news','post','shared','source','that','their','these','they','this','through','what','when','where','which','with','would','your','infinity','phi','http','https','www','com','latest','background','context']);
 
   const get=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
@@ -189,6 +192,26 @@
     addButton(storyContent.querySelector('.card-actions'),key,storyContent);
   }
 
+  let autoBuildStarted=false;
+  function clearAutoFlag(){
+    try{
+      const url=new URL(location.href);
+      url.searchParams.delete('buildSimilar');
+      history.replaceState(history.state,'',`${url.pathname}${url.search}${url.hash}`);
+    }catch{}
+  }
+
+  function maybeAutoBuild(){
+    if(!AUTO_SIMILAR||autoBuildStarted||!AUTO_STORY_KEY)return;
+    const article=[...feed.querySelectorAll('article[data-story-card]')].find(node=>node.dataset.storyCard===AUTO_STORY_KEY);
+    if(!article)return;
+    const button=article.querySelector('[data-build-similar]');
+    if(!button)return;
+    autoBuildStarted=true;
+    clearAutoFlag();
+    void buildSimilar(AUTO_STORY_KEY,article,button);
+  }
+
   let enhanceQueued=false;
   function queueEnhanceFeed(){
     if(enhanceQueued)return;
@@ -196,6 +219,7 @@
     requestAnimationFrame(()=>{
       enhanceQueued=false;
       enhanceFeed();
+      maybeAutoBuild();
     });
   }
 
@@ -211,4 +235,5 @@
 
   enhanceFeed();
   enhanceDialog();
+  maybeAutoBuild();
 })();
