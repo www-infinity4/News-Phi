@@ -2,7 +2,7 @@
   'use strict';
 
   const STORIES_KEY='phiShared:storyIndex:v2';
-  const INFINITY_URL='https://www-infinity4.github.io/C13b0/phi/';
+  const INFINITY_URL='https://www-infinity4.github.io/C13b0/';
 
   const clean=(value,max=1800)=>String(value??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,max);
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
