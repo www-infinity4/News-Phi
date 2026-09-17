@@ -29,4 +29,10 @@
 
   rebuild();
   window.addEventListener('controlphi:shared',()=>setTimeout(rebuild,0));
+  let passes=0;
+  const timer=setInterval(()=>{
+    rebuild();
+    passes+=1;
+    if(passes>=8)clearInterval(timer);
+  },3000);
 })();
