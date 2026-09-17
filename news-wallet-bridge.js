@@ -154,7 +154,7 @@
       <nav class="news-network-nav" aria-label="Phi network">
         <a href="https://www-infinity4.github.io/News-Phi/">News Phi</a>
         <a href="https://www-infinity4.github.io/Omni-Phi/">Omni Phi</a>
-        <a href="https://www-infinity4.github.io/C13b0/phi/">Infinity Phi</a>
+        <a href="https://www-infinity4.github.io/C13b0/">Infinity Phi</a>
         <div class="news-network-label">Wallets</div>
         <a href="https://www-infinity4.github.io/C13b0/wallet/">Infinity + Star Coin wallets</a>
         <div class="news-star-wallet" data-news-star-wallet></div>
