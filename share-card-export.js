@@ -96,7 +96,11 @@
 
   async function shareExactCard(button){
     const key=button.dataset.share||'';
-    const story=storyFor(key);if(!story)return false;
+    const story=storyFor(key)||window.__newsPhiStoryIndex?.[key]||null;
+    if(!story){
+      // Let app.js handle cards that have not yet persisted into localStorage.
+      return false;
+    }
     const url=landingUrl(story),title=shareTitle(story),text=shareText(story);
 
     if(!navigator.share){
@@ -134,6 +138,11 @@
 
   document.addEventListener('click',event=>{
     const button=event.target.closest?.('.share-card[data-share]');if(!button)return;
+    const key=button.dataset.share||'';
+    // Only intercept when this exporter can actually resolve the story.
+    // Previously it swallowed the click before app.js could share when the
+    // localStorage story index was stale/missing.
+    if(!storyFor(key))return;
     event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();void shareExactCard(button);
   },true);
 })();
