@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   const KEYS={shared:'phiShared:collection:v1',stories:'phiShared:storyIndex:v2',queue:'newsPhi:retrievalQueue:v2',ingest:'controlPhi:ingestQueue:v1',controlShares:'controlPhi:shareFeed:v1',config:'controlPhi:searchConfig:v1'};
-  const VERSION='source-publish-20260914';
+  const VERSION='store-keywords-dedupe-20260919';
   const STOP=new Set(['about','after','again','also','and','are','because','before','being','from','have','into','more','news','post','shared','source','that','their','these','they','this','through','what','when','where','which','with','would','your','infinity','phi','http','https','www','com']);
   const get=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
   const set=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
@@ -11,6 +11,7 @@
   const words=value=>clean(value).toLowerCase().replace(/https?:\/\/\S+/g,' ').replace(/[^a-z0-9'-]+/g,' ').split(/\s+/).filter(word=>word.length>2&&!STOP.has(word)&&!/^\d+$/.test(word));
   const overlap=(a,b)=>{const right=new Set(words(b));return [...new Set(words(a))].reduce((n,word)=>n+(right.has(word)?1:0),0)};
   const clip=(value,size=430)=>{const text=clean(value);return text.length>size?`${text.slice(0,size-1).trim()}…`:text};
+  const canonicalUrl=value=>{try{const u=new URL(clean(value));u.hash='';['utm_source','utm_medium','utm_campaign','utm_term','utm_content','gclid','fbclid'].forEach(k=>u.searchParams.delete(k));u.hostname=u.hostname.toLowerCase().replace(/^www\./,'');u.pathname=u.pathname.replace(/\/$/,'')||'/';return `${u.protocol}//${u.hostname}${u.pathname}${u.searchParams.toString()?`?${u.searchParams}`:''}`}catch{return clean(value).replace(/\/$/,'')}};
 
   function searchTerms(job){
     const counts=new Map();
@@ -40,13 +41,14 @@
   function rankSources(job,sources){
     const target=searchTerms(job).join(' '),seen=new Set();
     const minimum=searchTerms(job).length>1?2:1;
-    return sources.flatMap(source=>{const key=source.url||`${source.provider}:${source.title}`;if(!source.title||!source.excerpt||seen.has(key)||Boolean(job.excludedSourceUrl&&source.url===job.excludedSourceUrl))return [];seen.add(key);const score=overlap(`${source.title} ${source.excerpt}`,target);return score>=minimum?[{...source,_score:score}]:[]}).sort((a,b)=>b._score-a._score).map(({_score,...source})=>source);
+    const excluded=new Set([job.excludedSourceUrl,...(job.excludedSourceUrls||[]),job.sourceUrl].map(canonicalUrl).filter(Boolean));
+    return sources.flatMap(source=>{const key=canonicalUrl(source.url)||`${source.provider}:${source.title}`;if(!source.title||!source.excerpt||seen.has(key)||excluded.has(key))return [];seen.add(key);const score=overlap(`${source.title} ${source.excerpt}`,target);return score>=minimum?[{...source,_score:score}]:[]}).sort((a,b)=>b._score-a._score).map(({_score,...source})=>source);
   }
   const rawSignalCard=card=>!card||card.generatedBy==='news-phi-interest-bridge'||Boolean(card.ingestType)||(/^phi-/.test(card.storyKey||'')&&!card.sourceBacked);
 
   function collectJobs(){
     const queued=get(KEYS.queue,[]),byKey=new Map(queued.map(job=>[job.jobKey||job.id,job]));
-    [...get(KEYS.ingest,[]),...get(KEYS.controlShares,[])].forEach(record=>{const query=clean(record.searchText||record.query||record.text||record.extract||record.title||record.url);if(!query)return;const jobKey=`share:${hash(`${record.url||''}|${query}`)}`;if(!byKey.has(jobKey))byKey.set(jobKey,{jobKey,kind:'share',subject:clean(record.title),query,sourceUrl:clean(record.url),indexedText:clean(record.text||record.extract),collectedAt:record.collectedAt||new Date().toISOString(),status:'indexed'})});
+    [...get(KEYS.ingest,[]),...get(KEYS.controlShares,[])].forEach(record=>{const query=clean(record.searchText||record.query||record.text||record.extract||record.title||record.url);if(!query)return;const jobKey=`share:${hash(`${record.url||''}|${query}`)}`;if(!byKey.has(jobKey))byKey.set(jobKey,{jobKey,kind:'share',subject:clean(record.title),query,sourceUrl:'',excludedSourceUrl:clean(record.url),excludedSourceUrls:[clean(record.url)].filter(Boolean),indexedText:clean(record.text||record.extract),collectedAt:record.collectedAt||new Date().toISOString(),status:'indexed'})});
     const jobs=[...byKey.values()].slice(0,500);set(KEYS.queue,jobs);return jobs;
   }
 
@@ -61,8 +63,8 @@
   async function run(){
     if(running)return;running=true;
     try{
-      const jobs=collectJobs(),before=get(KEYS.shared,[]),shared=before.filter(card=>!rawSignalCard(card)),stories=get(KEYS.stories,{}),visible=new Map(shared.map(card=>[card.storyKey||card.url||card.id,card]));let changed=shared.length!==before.length;
-      for(const job of jobs.filter(item=>item.status!=='published').slice(0,8)){try{const card=await resolveJob(job);if(!card)continue;visible.set(card.storyKey,card);job.status='published';job.publishedStoryKey=card.storyKey;job.publishedAt=new Date().toISOString();changed=true;stories[card.storyKey]={...(stories[card.storyKey]||{}),headline:card.title,title:card.title,standfirst:card.extract,paragraphs:[card.extract],sources:card.sources,image:card.image,imageVerified:card.imageVerified,enriched:true,retrievalVersion:VERSION}}catch{}}
+      const jobs=collectJobs(),before=get(KEYS.shared,[]),shared=before.filter(card=>!rawSignalCard(card)),stories=get(KEYS.stories,{}),visible=new Map(shared.map(card=>[card.storyKey||card.url||card.id,card])),visibleUrls=new Set(shared.map(card=>canonicalUrl(card.url)).filter(Boolean));let changed=shared.length!==before.length;
+      for(const job of jobs.filter(item=>item.status!=='published').slice(0,8)){try{const card=await resolveJob(job);if(!card)continue;const cardUrl=canonicalUrl(card.url);if(cardUrl&&visibleUrls.has(cardUrl)){job.status='published';job.publishedStoryKey=[...visible.values()].find(existing=>canonicalUrl(existing.url)===cardUrl)?.storyKey||'';job.publishedAt=new Date().toISOString();changed=true;continue}visible.set(card.storyKey,card);if(cardUrl)visibleUrls.add(cardUrl);job.status='published';job.publishedStoryKey=card.storyKey;job.publishedAt=new Date().toISOString();changed=true;stories[card.storyKey]={...(stories[card.storyKey]||{}),headline:card.title,title:card.title,standfirst:card.extract,paragraphs:[card.extract],sources:card.sources,image:card.image,imageVerified:card.imageVerified,enriched:true,retrievalVersion:VERSION}}catch{}}
       if(!changed)return;set(KEYS.shared,[...visible.values()].sort((a,b)=>String(b.collectedAt).localeCompare(String(a.collectedAt))).slice(0,500));set(KEYS.queue,jobs);set(KEYS.stories,stories);window.dispatchEvent(new CustomEvent('newsphi:retrieval-upgraded',{detail:{version:VERSION}}));document.getElementById('refreshFeed')?.click();
     }finally{running=false}
   }
