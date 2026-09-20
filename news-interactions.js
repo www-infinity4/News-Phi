@@ -91,7 +91,7 @@
   }
 
   async function searxng(query,round){
-    const config=get(CONFIG_KEY,{}),endpoint=clean(config?.endpoints?.searxng||config?.searxng||'').replace(/\/$/,'');
+    const config=get(CONFIG_KEY,{}),endpoint=clean(config?.endpoints?.searxng||config?.searxng||'https://orange-brook-a2ac.marvaseater.workers.dev').replace(/\/$/,'');
     if(!endpoint)return [];
     const response=await timeout(fetch(`${endpoint}/search?${new URLSearchParams({q:query,format:'json',pageno:String(round+1)})}`,{cache:'no-store'}),6500);
     if(!response.ok)return [];
