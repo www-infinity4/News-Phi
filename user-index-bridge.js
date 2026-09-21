@@ -52,27 +52,4 @@
     if (story) indexStory(story);
   }, true);
 
-  if (!document.getElementById("newsPhiGuardButton")) {
-    const button = document.createElement("button");
-    button.id = "newsPhiGuardButton";
-    button.type = "button";
-    button.setAttribute("aria-label", "Open News Phi menu");
-    button.textContent = "☰";
-    Object.assign(button.style, { position:"fixed", top:"12px", left:"12px", zIndex:"2147483646", width:"46px", height:"46px", border:"1px solid #ffffff44", borderRadius:"14px", background:"#140b25", color:"#fff", fontSize:"23px", boxShadow:"0 7px 24px #0005" });
-    const nav = document.createElement("nav");
-    nav.id = "newsPhiGuardMenu";
-    nav.setAttribute("aria-label", "News Phi navigation");
-    nav.innerHTML = [
-      ["News Phi","https://www-infinity4.github.io/News-Phi/"],
-      ["Infinity Phi","https://www-infinity4.github.io/C13b0/"],
-      ["Web Phi","https://www-infinity4.github.io/Web-Phi/"],
-      ["Omni Phi","https://www-infinity4.github.io/Omni-Phi/"],
-      ["Unified wallet","https://www-infinity4.github.io/C13b0/wallet/"]
-    ].map(([label, href]) => '<a href="' + href + '">' + label + '</a>').join("");
-    Object.assign(nav.style, { position:"fixed", top:"68px", left:"12px", zIndex:"2147483646", display:"none", width:"min(310px,calc(100vw - 24px))", padding:"12px", border:"1px solid #ffffff2e", borderRadius:"18px", background:"#10091d", boxShadow:"0 14px 40px #0008" });
-    nav.querySelectorAll("a").forEach(a => Object.assign(a.style, { display:"block", padding:"13px", borderBottom:"1px solid #ffffff22", color:"#fff", textDecoration:"none", fontWeight:"800" }));
-    button.addEventListener("click", () => { nav.style.display = nav.style.display === "none" ? "block" : "none"; });
-    nav.addEventListener("click", () => { nav.style.display = "none"; });
-    document.body.append(button, nav);
-  }
 })();
