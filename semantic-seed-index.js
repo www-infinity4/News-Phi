@@ -59,8 +59,25 @@
       seedOnly:true,ingestType:'semantic-seed',semanticVersion:1,
       generatedBy:'news-phi-index-replay'
     }));
+    const infinityHistory=get('infinity_phi_context_v1',[]);
+    const omniHistory=get('omniPhi:history:v1',[]);
+    const searchSeeds=[
+      ...(Array.isArray(infinityHistory)?infinityHistory:[]).map(item=>({
+        id:`infinity-search:${norm(item?.query)}`,storyKey:`infinity-search:${norm(item?.query)}`,
+        title:clean(item?.query,260),sourceTitle:clean(item?.query,260),
+        searchQuery:clean(item?.resolved||item?.query,260),collectedAt:item?.at?new Date(item.at).toISOString():'',
+        seedOnly:true,ingestType:'semantic-seed',semanticVersion:1,generatedBy:'news-phi-infinity-search-index'
+      })),
+      ...(Array.isArray(omniHistory)?omniHistory:[]).map(item=>({
+        id:`omni-search:${norm(item?.query)}`,storyKey:`omni-search:${norm(item?.query)}`,
+        title:clean(item?.query,260),sourceTitle:clean(item?.query,260),
+        searchQuery:clean(item?.query,260),collectedAt:item?.createdAt||'',
+        seedOnly:true,ingestType:'semantic-seed',semanticVersion:1,generatedBy:'news-phi-omni-search-index'
+      }))
+    ].filter(seed=>seed.title);
+    searchSeeds.forEach(seed=>{seed.semanticAnchors=fallbackAnchors(seed)});
     const combined=new Map();
-    [...live,...archived].forEach(seed=>{const key=keyOf(seed);if(key&&!combined.has(key))combined.set(key,seed)});
+    [...live,...archived,...searchSeeds].forEach(seed=>{const key=keyOf(seed);if(key&&!combined.has(key))combined.set(key,seed)});
     return [...combined.values()];
   }
 
