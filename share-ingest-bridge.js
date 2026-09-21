@@ -38,8 +38,8 @@
     button.id='pasteToPhi';
     button.type='button';
     button.className='refresh';
-    button.textContent='Paste to Phi';
-    button.setAttribute('aria-label','Import clipboard content into News Phi');
+    button.textContent='Import clipboard';
+    button.setAttribute('aria-label','Import copied link or text into News Phi');button.title='Build a News Phi seed from a link or text currently copied on this device';
     button.addEventListener('click',async()=>{
       button.disabled=true;
       try{
