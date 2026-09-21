@@ -41,7 +41,8 @@
     if(!Array.isArray(shared)||!shared.length)return [];
     let changed=false;
     const next=shared.map(card=>{
-      const candidate=card?.ingestType==='semantic-seed'||card?.seedOnly||card?.selectedFromImageSearch||card?.kind==='image-seed';
+      const generated=clean(card?.generatedBy,120).toLowerCase();
+      const candidate=Boolean(card)&&(card?.ingestType==='semantic-seed'||card?.seedOnly||card?.selectedFromImageSearch||card?.kind==='image-seed'||((card?.collectedAt||card?.tokenId||card?.collectedFrom||card?.sourceLocked)&&!generated.startsWith('news-phi-semantic')));
       if(!candidate)return card;
       const anchors=Array.isArray(card.semanticAnchors)&&card.semanticAnchors.length?card.semanticAnchors:fallbackAnchors(card);
       if(card.ingestType==='semantic-seed'&&card.seedOnly&&card.semanticAnchors===anchors)return card;
@@ -146,9 +147,11 @@
     return score;
   }
 
+  function fingerprintOf(seed){return `v2|${seed.collectedAt||''}|${seed.semanticVersion||1}|${clean(seed.title,160)}|${(seed.semanticAnchors||[]).slice(0,12).map(a=>`${a.term}:${a.weight}`).join('|')}`}
+
   async function buildFromSeed(seed,processed){
     const key=keyOf(seed);if(!key)return 0;
-    const fingerprint=`v1|${seed.collectedAt||''}|${seed.semanticVersion||1}|${clean(seed.title,160)}|${(seed.semanticAnchors||[]).slice(0,12).map(a=>`${a.term}:${a.weight}`).join('|')}`;
+    const fingerprint=fingerprintOf(seed);
     if(processed[key]===fingerprint)return 0;
 
     const reader=await readerText(seed.url||seed.sourceUrl||'');
@@ -219,7 +222,7 @@
     mergeIndex(seeds);
     const processed=get(PROCESSED,{});
     let built=0;
-    const pending=seeds.slice().sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||''))).slice(0,3);
+    const pending=seeds.slice().sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||''))).filter(seed=>processed[keyOf(seed)]!==fingerprintOf(seed)).slice(0,8);
     for(const seed of pending)built+=await buildFromSeed(seed,processed);
     set(PROCESSED,processed);
     if(built){
