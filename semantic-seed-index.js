@@ -50,7 +50,18 @@
       return {...card,seedOnly:true,ingestType:'semantic-seed',semanticVersion:1,semanticAnchors:anchors,generatedBy:card.generatedBy||'news-phi-semantic-seed'};
     });
     if(changed)set(SHARED,next);
-    return next.filter(card=>card?.ingestType==='semantic-seed'||card?.seedOnly);
+    const live=next.filter(card=>card?.ingestType==='semantic-seed'||card?.seedOnly);
+    const saved=get(INDEX,{seeds:{}})?.seeds||{};
+    const archived=Object.values(saved).map(seed=>({
+      id:seed.key,storyKey:seed.key,title:seed.title||'',sourceTitle:seed.title||'',
+      searchQuery:seed.query||'',url:seed.url||'',image:seed.image||'',
+      collectedAt:seed.at||'',semanticAnchors:Array.isArray(seed.anchors)?seed.anchors:[],
+      seedOnly:true,ingestType:'semantic-seed',semanticVersion:1,
+      generatedBy:'news-phi-index-replay'
+    }));
+    const combined=new Map();
+    [...live,...archived].forEach(seed=>{const key=keyOf(seed);if(key&&!combined.has(key))combined.set(key,seed)});
+    return [...combined.values()];
   }
 
   function mergeIndex(seeds){
@@ -216,25 +227,36 @@
     return built.length;
   }
 
+  let running=false;
   async function run(){
-    const seeds=normalizeSeeds();
-    if(!seeds.length)return;
-    mergeIndex(seeds);
-    const processed=get(PROCESSED,{});
-    let built=0;
-    const pending=seeds.slice().sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||''))).filter(seed=>processed[keyOf(seed)]!==fingerprintOf(seed)).slice(0,8);
-    for(const seed of pending)built+=await buildFromSeed(seed,processed);
-    set(PROCESSED,processed);
-    if(built){
+    if(running)return;
+    running=true;
+    try{
+      const seeds=normalizeSeeds();
+      if(!seeds.length)return;
+      mergeIndex(seeds);
+      const processed=get(PROCESSED,{});
+      let built=0;
+      const pending=seeds.slice().sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||''))).filter(seed=>processed[keyOf(seed)]!==fingerprintOf(seed)).slice(0,8);
       const label=document.getElementById('syncLabel');
-      if(label)label.textContent=`${built} related cards built from your semantic image index`;
-      setTimeout(()=>document.getElementById('refreshFeed')?.click(),50);
-      window.dispatchEvent(new CustomEvent('controlphi:shared',{detail:{source:'news-phi-semantic-index',count:built}}));
-    }
+      if(label&&pending.length)label.textContent=`Building news from ${pending.length} indexed selections…`;
+      for(const seed of pending)built+=await buildFromSeed(seed,processed);
+      set(PROCESSED,processed);
+      if(label)label.textContent=built?`${built} new stories built from your index`:pending.length?'Indexed selections checked — refresh for the next batch':'Your collected index is current';
+      if(built){
+        setTimeout(()=>document.getElementById('refreshFeed')?.click(),50);
+        window.dispatchEvent(new CustomEvent('controlphi:shared',{detail:{source:'news-phi-semantic-index',count:built}}));
+      }
+    }finally{running=false}
   }
 
-  const seeds=normalizeSeeds();
-  if(seeds.length)mergeIndex(seeds);
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>void run(),350),{once:true});
-  else setTimeout(()=>void run(),350);
+  function install(){
+    const seeds=normalizeSeeds();
+    if(seeds.length)mergeIndex(seeds);
+    document.getElementById('refreshFeed')?.addEventListener('click',()=>setTimeout(()=>void run(),80));
+    addEventListener('storage',event=>{if(event.key===SHARED||event.key===INDEX)setTimeout(()=>void run(),120)});
+    setTimeout(()=>void run(),350);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
+  else install();
 })();
