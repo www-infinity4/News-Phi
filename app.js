@@ -388,7 +388,18 @@
   document.getElementById('closeStory').addEventListener('click',closeStory);
   dialog.addEventListener('click',event=>{if(event.target===dialog)closeStory()});
   search.addEventListener('input',render);
-  document.getElementById('refreshFeed').addEventListener('click',()=>{state=synchronize();render()});
+  document.getElementById('refreshFeed').addEventListener('click',async()=>{
+    const button=document.getElementById('refreshFeed');
+    if(button.disabled)return;
+    button.disabled=true;button.textContent='Refreshing…';
+    try{
+      if(window.NewsPhiMonitor?.refresh)await window.NewsPhiMonitor.refresh();
+      state=synchronize();render();
+    }catch(error){
+      console.warn('Fresh News Phi refresh failed',error);
+      syncLabel.textContent='Fresh retrieval unavailable · showing saved stories';
+    }finally{button.disabled=false;button.textContent='Refresh'}
+  });
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
   window.addEventListener('newsphi:monitor-feed',()=>{state=synchronize();render()});
   window.addEventListener('storage',event=>{if(event.key===KEYS.monitorCards){state=synchronize();render()}});
