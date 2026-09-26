@@ -137,7 +137,8 @@
       similarQuery:similarQueryFor(card,headline,kind),
       sources:Array.isArray(card.sources)?card.sources:(Array.isArray(previous.sources)?previous.sources:[]),
       enriched:Boolean(card.sourceBacked||previous.enriched),
-      sourceFingerprint:card.extract||previous.sourceFingerprint||''
+      sourceFingerprint:card.extract||previous.sourceFingerprint||'',
+      quantWhy:card.quantWhy||previous.quantWhy||null
     };
   }
 
@@ -327,6 +328,14 @@
     return 'PERSONALIZED NEWS';
   }
 
+  function whyText(story){
+    const w=story?.quantWhy;if(!w)return '';
+    const seed=clean(w.seedTopic||story.searchQuery||''), topic=clean(story.searchQuery||'');
+    if(Number(w.distance)===0)return seed?('From your '+seed+' Quant'):'From your Quant';
+    if(seed&&topic&&seed.toLowerCase()!==topic.toLowerCase())return 'Quant path: '+seed+' → '+topic;
+    return seed?('Related to your '+seed+' Quant'):'Related through your Quant graph';
+  }
+
   function renderStoryCardState(key){
     const node=feed?.querySelector(`[data-story-card="${CSS.escape(key)}"]`);
     const story=state.storyIndex[key];
@@ -348,7 +357,7 @@
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div></div></article>`;
+      return `<article class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p>${whyText(story)?`<p class="quant-why">${esc(whyText(story))}</p>`:''}<div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
@@ -363,7 +372,7 @@
     if(!story)return;
     dialog.dataset.storyKey=key;
     const sources=(story.sources||[]).map(source=>`<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a><span>${esc(source.provider||'Source')}</span></li>`).join('');
-    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
+    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${whyText(story)?`<p class="quant-why">${esc(whyText(story))}</p>`:''}${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
     storyContent.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
     if(location.hash!==`#story=${encodeURIComponent(key)}`)history.replaceState(null,'',`#story=${encodeURIComponent(key)}`);
     if(!rerender)dialog.showModal();
