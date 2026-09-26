@@ -40,7 +40,7 @@
   }
 
   async function refreshFromMonitor(){
-    const endpoint=clean(localStorage.getItem(ENDPOINT_KEY));
+    const endpoint=clean(localStorage.getItem(ENDPOINT_KEY)||'https://monitor-phi.marvaseater.workers.dev');
     if(!endpoint)return null;
     const seeds=chosenTopics();
     if(!seeds.length)return null;
