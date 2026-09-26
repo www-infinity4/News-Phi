@@ -7,7 +7,8 @@
     legacyStories:'phiShared:storyIndex:v1',
     omniProfile:'omniPhi:profile:v1',
     omniResearch:'omniPhi:lastResearch:v1',
-    controlShares:'controlPhi:shareFeed:v1'
+    controlShares:'controlPhi:shareFeed:v1',
+    monitorCards:'newsPhi:monitorCards:v1'
   };
 
   const STOP=new Set([
@@ -151,7 +152,8 @@
     const profile=get(KEYS.omniProfile,{collected:[]});
     const research=get(KEYS.omniResearch,null);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
-    const all=[...shared,...(profile.collected||[])].filter(isVisibleCard);
+    const monitor=get(KEYS.monitorCards,[]);
+    const all=[...monitor,...shared,...(profile.collected||[])].filter(isVisibleCard);
     const merged=new Map();
 
     all.forEach(card=>{
@@ -379,6 +381,8 @@
   search.addEventListener('input',render);
   document.getElementById('refreshFeed').addEventListener('click',()=>{state=synchronize();render()});
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
+  window.addEventListener('newsphi:monitor-feed',()=>{state=synchronize();render()});
+  window.addEventListener('storage',event=>{if(event.key===KEYS.monitorCards){state=synchronize();render()}});
 
   const importedKey=importSharedCard();
   render();
