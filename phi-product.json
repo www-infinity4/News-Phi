@@ -1,0 +1,29 @@
+{
+  "schema": "phi-product/v1",
+  "name": "News Phi",
+  "repo": "www-infinity4/News-Phi",
+  "productionUrl": "https://www-infinity4.github.io/News-Phi/",
+  "automation": {
+    "monitor": "https://monitor-phi.marvaseater.workers.dev",
+    "mode": "observe-diagnose-patch-verify",
+    "changePolicy": "scoped",
+    "completionGate": "verification-required"
+  },
+  "checks": [
+    {
+      "id": "page-load",
+      "type": "http",
+      "expect": "2xx"
+    },
+    {
+      "id": "feed",
+      "type": "interaction",
+      "expect": "fresh-cards-render"
+    },
+    {
+      "id": "collect-context",
+      "type": "contract",
+      "expect": "quant-provenance-retained"
+    }
+  ]
+}
