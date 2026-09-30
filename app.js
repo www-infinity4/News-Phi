@@ -335,7 +335,7 @@
       const story=state.storyIndex[keyOf(card)];
       return `${story?.headline||card.title||''} ${story?.standfirst||card.extract||''} ${story?.similarQuery||card.searchQuery||''}`.toLowerCase().includes(term);
     });
-    count.textContent=`${cards.length} stor${cards.length===1?'y':'ies'}`;
+    if(count)count.textContent=`${cards.length} stor${cards.length===1?'y':'ies'}`;
     syncLabel.textContent=`${state.cards.length} personalized stor${state.cards.length===1?'y':'ies'}`;
     if(!cards.length){
       feed.innerHTML=`<div class="empty-feed"><h2>${state.cards.length?'No stories match that filter':'Your personalized news desk is ready'}</h2><p>${state.cards.length?'Try a broader word.':'Views, searches and shares create subject signals. News Phi turns those signals into readable stories instead of displaying the activity log itself.'}</p>${state.cards.length?'':`<a href="https://www-infinity4.github.io/Omni-Phi/">Open Omni Phi</a>`}</div>`;
