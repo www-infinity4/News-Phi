@@ -9,7 +9,8 @@
     omniResearch:'omniPhi:lastResearch:v1',
     controlShares:'controlPhi:shareFeed:v1',
     monitorCards:'newsPhi:monitorCards:v1',
-    quantaCloud:'newsPhi:quantaCloudCards:v1'
+    quantaCloud:'newsPhi:quantaCloudCards:v1',
+    monitorStatus:'newsPhi:monitorStatus:v1'
   };
 
   const STOP=new Set([
@@ -359,7 +360,9 @@
       return `${story?.headline||card.title||''} ${story?.standfirst||card.extract||''} ${story?.similarQuery||card.searchQuery||''}`.toLowerCase().includes(term);
     });
     count.textContent='Fresh index stories';
-    syncLabel.textContent=state.cards.length?'Fresh stories from your index':'Reading your index for fresh stories';
+    const retrieval=get(KEYS.monitorStatus,null);
+    const stamp=retrieval?.retrievedAt?new Date(retrieval.retrievedAt).toLocaleString():'';
+    syncLabel.textContent=retrieval?.state==='fresh'?`Monitor / SearXNG · retrieved ${stamp} · ${retrieval.count} stories`:retrieval?.state==='empty'?`Monitor / SearXNG · ${stamp} · no new stories returned`:retrieval?.state==='error'?`Monitor unavailable · ${retrieval.message||'request failed'} · showing saved stories`:retrieval?.state==='no-seeds'?'No Phi activity seeds available yet':state.cards.length?'Saved stories · no verified retrieval yet':'Reading your index for fresh stories';
     if(!cards.length){
       feed.innerHTML=`<div class="empty-feed"><h2>${state.cards.length?'No stories match that filter':'Your personalized news desk is ready'}</h2><p>${state.cards.length?'Try a broader word.':'Views, searches and shares create subject signals. News Phi turns those signals into readable stories instead of displaying the activity log itself.'}</p>${state.cards.length?'':`<a href="https://www-infinity4.github.io/Omni-Phi/">Open Omni Phi</a>`}</div>`;
       return;
@@ -402,21 +405,20 @@
     if(button.disabled)return;
     button.disabled=true;button.textContent='Refreshing…';
     try{
-      await Promise.allSettled([
-        window.NewsPhiQuantaCloud?.refresh?.(),
-        window.NewsPhiMonitor?.refresh?.()
-      ]);
+      await window.NewsPhiQuantaCloud?.refresh?.();
+      await window.NewsPhiMonitor?.refresh?.();
       state=synchronize();render();
     }catch(error){
       console.warn('Fresh News Phi refresh failed',error);
-      syncLabel.textContent='Fresh retrieval unavailable · showing saved stories';
+      state=synchronize();render();
     }finally{button.disabled=false;button.textContent='Refresh'}
   });
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
   window.addEventListener('newsphi:monitor-feed',()=>{state=synchronize();render()});
+  window.addEventListener('newsphi:monitor-error',()=>{state=synchronize();render()});
   window.addEventListener('phi:ingested',()=>{state=synchronize();render()});
   window.addEventListener('phiShared:collection-change',()=>{state=synchronize();render()});
-  window.addEventListener('storage',event=>{if([KEYS.monitorCards,KEYS.quantaCloud,KEYS.shared,KEYS.controlShares,KEYS.omniProfile,KEYS.omniResearch].includes(event.key)){state=synchronize();render()}});
+  window.addEventListener('storage',event=>{if([KEYS.monitorCards,KEYS.quantaCloud,KEYS.shared,KEYS.controlShares,KEYS.omniProfile,KEYS.omniResearch,KEYS.monitorStatus].includes(event.key)){state=synchronize();render()}});
 
   const importedKey=importSharedCard();
   render();
