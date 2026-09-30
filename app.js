@@ -8,7 +8,8 @@
     omniProfile:'omniPhi:profile:v1',
     omniResearch:'omniPhi:lastResearch:v1',
     controlShares:'controlPhi:shareFeed:v1',
-    monitorCards:'newsPhi:monitorCards:v1'
+    monitorCards:'newsPhi:monitorCards:v1',
+    quantaCloud:'newsPhi:quantaCloudCards:v1'
   };
 
   const STOP=new Set([
@@ -143,7 +144,8 @@
   }
 
   function isVisibleCard(card){
-    if(!card||card.generatedBy==='news-phi-interest-bridge'||card.ingestType)return false;
+    if(!card||card.seedOnly)return false;
+    if(card.generatedBy==='news-phi-interest-bridge'&&!card.sourceBacked&&card.type!=='collect')return false;
     if(card.kind==='share'&&!card.sourceBacked)return false;
     return Boolean(clean(card.title)&&clean(card.extract||card.body));
   }
@@ -154,7 +156,14 @@
     const research=get(KEYS.omniResearch,null);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
     const monitor=get(KEYS.monitorCards,[]);
-    const all=[...monitor,...shared,...(profile.collected||[])].filter(isVisibleCard);
+    const quanta=get(KEYS.quantaCloud,[]);
+    const controlShares=get(KEYS.controlShares,[]);
+    const researchCards=Array.isArray(research?.sources)?research.sources:[];
+    const freshMonitor=monitor.filter(isVisibleCard);
+    const supporting=[...quanta,...controlShares,...shared,...(profile.collected||[]),...researchCards].filter(isVisibleCard);
+    // Once Monitor has a fresh retrieval, make that retrieval the visible News desk.
+    // Supporting Phi cards remain seed/context data instead of keeping old headlines pinned forever.
+    const all=freshMonitor.length?freshMonitor:supporting;
     const merged=new Map();
 
     all.forEach(card=>{
@@ -393,7 +402,10 @@
     if(button.disabled)return;
     button.disabled=true;button.textContent='Refreshing…';
     try{
-      if(window.NewsPhiMonitor?.refresh)await window.NewsPhiMonitor.refresh();
+      await Promise.allSettled([
+        window.NewsPhiQuantaCloud?.refresh?.(),
+        window.NewsPhiMonitor?.refresh?.()
+      ]);
       state=synchronize();render();
     }catch(error){
       console.warn('Fresh News Phi refresh failed',error);
@@ -402,7 +414,9 @@
   });
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
   window.addEventListener('newsphi:monitor-feed',()=>{state=synchronize();render()});
-  window.addEventListener('storage',event=>{if(event.key===KEYS.monitorCards){state=synchronize();render()}});
+  window.addEventListener('phi:ingested',()=>{state=synchronize();render()});
+  window.addEventListener('phiShared:collection-change',()=>{state=synchronize();render()});
+  window.addEventListener('storage',event=>{if([KEYS.monitorCards,KEYS.quantaCloud,KEYS.shared,KEYS.controlShares,KEYS.omniProfile,KEYS.omniResearch].includes(event.key)){state=synchronize();render()}});
 
   const importedKey=importSharedCard();
   render();
