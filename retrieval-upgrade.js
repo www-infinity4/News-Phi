@@ -1,7 +1,8 @@
 (function(){
   'use strict';
   const KEYS={shared:'phiShared:collection:v1',stories:'phiShared:storyIndex:v2',queue:'newsPhi:retrievalQueue:v2',ingest:'controlPhi:ingestQueue:v1',controlShares:'controlPhi:shareFeed:v1',config:'controlPhi:searchConfig:v1'};
-  const VERSION='source-publish-20260914';
+  const VERSION='cloudflare-live-20260929';
+  const SEARXNG='https://orange-brook-a2ac.marvaseater.workers.dev';
   const STOP=new Set(['about','after','again','also','and','are','because','before','being','from','have','into','more','news','post','shared','source','that','their','these','they','this','through','what','when','where','which','with','would','your','infinity','phi','http','https','www','com']);
   const get=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
   const set=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
@@ -32,8 +33,8 @@
     const data=await response.json();return (data?.message?.items||[]).flatMap(item=>{const title=clean(item.title?.[0]),excerpt=clean(item.abstract);if(!title||!excerpt)return [];const parts=item.published?.['date-parts']?.[0]||item.issued?.['date-parts']?.[0]||[];return [{title,url:item.URL||(item.DOI?`https://doi.org/${item.DOI}`:''),excerpt,provider:item.publisher||'Crossref',publishedAt:parts.length?parts.join('-'):''}]});
   }
   async function searxng(query){
-    const config=get(KEYS.config,{}),endpoint=clean(config?.endpoints?.searxng||config?.searxng||'').replace(/\/$/,'');if(!endpoint)return [];
-    const response=await timeout(fetch(`${endpoint}/search?${new URLSearchParams({q:query,format:'json'})}`,{cache:'no-store'}),5000);if(!response.ok)return [];
+    const endpoint=SEARXNG;
+    const response=await timeout(fetch(`${endpoint}/search?${new URLSearchParams({q:query,format:'json',categories:'news',time_range:'week',_newsphi:String(Date.now())})}`,{cache:'no-store',headers:{'Cache-Control':'no-cache'}}),8000);if(!response.ok)return [];
     const data=await response.json();return (data?.results||[]).slice(0,12).flatMap(item=>item.title&&item.url&&(item.content||item.snippet)?[{title:clean(item.title),url:clean(item.url),excerpt:clean(item.content||item.snippet),image:clean(item.img_src||item.thumbnail),provider:'Web result',publishedAt:clean(item.publishedDate)}]:[]);
   }
 
@@ -62,7 +63,7 @@
     if(running)return;running=true;
     try{
       const jobs=collectJobs(),before=get(KEYS.shared,[]),shared=before.filter(card=>!rawSignalCard(card)),stories=get(KEYS.stories,{}),visible=new Map(shared.map(card=>[card.storyKey||card.url||card.id,card]));let changed=shared.length!==before.length;
-      for(const job of jobs.filter(item=>item.status!=='published').slice(0,8)){try{const card=await resolveJob(job);if(!card)continue;visible.set(card.storyKey,card);job.status='published';job.publishedStoryKey=card.storyKey;job.publishedAt=new Date().toISOString();changed=true;stories[card.storyKey]={...(stories[card.storyKey]||{}),headline:card.title,title:card.title,standfirst:card.extract,paragraphs:[card.extract],sources:card.sources,image:card.image,imageVerified:card.imageVerified,enriched:true,retrievalVersion:VERSION}}catch{}}
+      for(const job of jobs.slice(0,8)){try{const card=await resolveJob(job);if(!card)continue;visible.set(card.storyKey,card);job.status='published';job.publishedStoryKey=card.storyKey;job.publishedAt=new Date().toISOString();job.lastFreshRetrievalAt=job.publishedAt;changed=true;stories[card.storyKey]={...(stories[card.storyKey]||{}),headline:card.title,title:card.title,standfirst:card.extract,paragraphs:[card.extract],sources:card.sources,image:card.image,imageVerified:card.imageVerified,enriched:true,retrievalVersion:VERSION}}catch{}}
       if(!changed)return;set(KEYS.shared,[...visible.values()].sort((a,b)=>String(b.collectedAt).localeCompare(String(a.collectedAt))).slice(0,500));set(KEYS.queue,jobs);set(KEYS.stories,stories);window.dispatchEvent(new CustomEvent('newsphi:retrieval-upgraded',{detail:{version:VERSION}}));document.getElementById('refreshFeed')?.click();
     }finally{running=false}
   }
