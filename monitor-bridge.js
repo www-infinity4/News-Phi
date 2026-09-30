@@ -7,6 +7,7 @@
   const CONTROL_SHARES='controlPhi:shareFeed:v1';
   const ENDPOINT_KEY='newsPhi:monitorEndpoint:v1';
   const MONITOR_CARDS='newsPhi:monitorCards:v1';
+  const MONITOR_STATUS='newsPhi:monitorStatus:v1';
   const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
@@ -47,7 +48,9 @@
       generatedBy:'monitor-news',
       quantWhy:story.why||null
     })).filter(card=>card.title&&card.url&&card.extract);
-    if(stories.length)write(MONITOR_CARDS,stories);
+    // Empty successful retrievals must clear old headlines, not masquerade as fresh news.
+    write(MONITOR_CARDS,stories);
+    write(MONITOR_STATUS,{state:stories.length?'fresh':'empty',retrievedAt:clean(payload?.generatedAt)||new Date().toISOString(),count:stories.length,source:'Monitor / SearXNG',seeds:(payload?.seeds||[]).length});
     return stories;
   }
 
@@ -55,16 +58,22 @@
     const endpoint=clean(localStorage.getItem(ENDPOINT_KEY)||'https://monitor-phi.marvaseater.workers.dev');
     if(!endpoint)return null;
     const seeds=chosenTopics();
-    if(!seeds.length)return null;
-    const response=await fetch(endpoint.replace(/\/$/,'')+'/p/news/feed',{
-      method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({seeds,depth:2})
-    });
-    if(!response.ok)throw new Error('Monitor News feed failed');
-    const payload=await response.json();
-    const cards=publish(payload);
-    window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{...payload,cards}}));
-    return payload;
+    if(!seeds.length){write(MONITOR_CARDS,[]);write(MONITOR_STATUS,{state:'no-seeds',retrievedAt:new Date().toISOString(),count:0,source:'Monitor / SearXNG'});window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{status:'no-seeds',cards:[]}}));return null;}
+    try{
+      const response=await fetch(endpoint.replace(/\/$/,'')+'/p/news/feed',{
+        method:'POST',cache:'no-store',headers:{'content-type':'application/json','cache-control':'no-cache'},
+        body:JSON.stringify({seeds,depth:2})
+      });
+      if(!response.ok)throw new Error('Monitor HTTP '+response.status);
+      const payload=await response.json();
+      const cards=publish(payload);
+      window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{...payload,cards}}));
+      return payload;
+    }catch(error){
+      write(MONITOR_STATUS,{state:'error',checkedAt:new Date().toISOString(),message:clean(error?.message),source:'Monitor / SearXNG'});
+      window.dispatchEvent(new CustomEvent('newsphi:monitor-error',{detail:{message:clean(error?.message)}}));
+      throw error;
+    }
   }
 
   window.NewsPhiMonitor={chosenTopics,refresh:refreshFromMonitor,endpointKey:ENDPOINT_KEY,cardsKey:MONITOR_CARDS};
