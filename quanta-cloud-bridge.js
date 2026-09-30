@@ -3,6 +3,7 @@
 
   const ENDPOINT='https://quanta-phi-ledger.marvaseater.workers.dev/v1/quants/collects';
   const COLLECTION='phiShared:collection:v1';
+  const QUEUE='newsPhi:retrievalQueue:v2';
   const CACHE='newsPhi:quantaCloudCards:v1';
   const REFRESH_MS=60000;
 
@@ -41,19 +42,18 @@
   }
 
   function merge(cards){
-    const shared=read(COLLECTION,[]);
-    const merged=new Map((Array.isArray(shared)?shared:[]).map(card=>[
-      String(card?.storyKey||card?.id||card?.url||card?.title||Math.random()),card
-    ]));
-    cards.forEach(card=>merged.set(card.storyKey,card));
-    const result=[...merged.values()]
-      .sort((a,b)=>String(b?.collectedAt||'').localeCompare(String(a?.collectedAt||'')))
-      .slice(0,1200);
-    write(COLLECTION,result);
     write(CACHE,cards);
+    const jobs=read(QUEUE,[]),byKey=new Map((Array.isArray(jobs)?jobs:[]).map(job=>[job.jobKey,job]));
+    cards.forEach(card=>{
+      const jobKey='quanta:'+card.storyKey;
+      const previous=byKey.get(jobKey)||{};
+      byKey.set(jobKey,{...previous,jobKey,kind:'collect',subject:card.title,query:card.searchQuery||card.title,sourceUrl:card.sourceUrl||'',indexedText:card.body||card.extract||'',collectedAt:card.collectedAt,status:'indexed'});
+    });
+    const queued=[...byKey.values()].sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||''))).slice(0,500);
+    write(QUEUE,queued);
     window.dispatchEvent(new CustomEvent('phi:ingested',{detail:{source:'quanta-cloud',count:cards.length}}));
-    window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));
-    return result;
+    window.dispatchEvent(new Event('newsphi:run-retrieval'));
+    return queued;
   }
 
   async function refresh(){
