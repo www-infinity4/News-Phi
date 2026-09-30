@@ -7,10 +7,7 @@
     legacyStories:'phiShared:storyIndex:v1',
     omniProfile:'omniPhi:profile:v1',
     omniResearch:'omniPhi:lastResearch:v1',
-    controlShares:'controlPhi:shareFeed:v1',
-    monitorCards:'newsPhi:monitorCards:v1',
-    quantaCloud:'newsPhi:quantaCloudCards:v1',
-    monitorStatus:'newsPhi:monitorStatus:v1'
+    controlShares:'controlPhi:shareFeed:v1'
   };
 
   const STOP=new Set([
@@ -139,14 +136,12 @@
       similarQuery:similarQueryFor(card,headline,kind),
       sources:Array.isArray(card.sources)?card.sources:(Array.isArray(previous.sources)?previous.sources:[]),
       enriched:Boolean(card.sourceBacked||previous.enriched),
-      sourceFingerprint:card.extract||previous.sourceFingerprint||'',
-      quantWhy:card.quantWhy||previous.quantWhy||null
+      sourceFingerprint:card.extract||previous.sourceFingerprint||''
     };
   }
 
   function isVisibleCard(card){
-    if(!card||card.seedOnly)return false;
-    if(card.generatedBy==='news-phi-interest-bridge'&&!card.sourceBacked&&card.type!=='collect')return false;
+    if(!card||card.generatedBy==='news-phi-interest-bridge'||card.ingestType)return false;
     if(card.kind==='share'&&!card.sourceBacked)return false;
     return Boolean(clean(card.title)&&clean(card.extract||card.body));
   }
@@ -156,15 +151,7 @@
     const profile=get(KEYS.omniProfile,{collected:[]});
     const research=get(KEYS.omniResearch,null);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
-    const monitor=get(KEYS.monitorCards,[]);
-    const quanta=get(KEYS.quantaCloud,[]);
-    const controlShares=get(KEYS.controlShares,[]);
-    const researchCards=Array.isArray(research?.sources)?research.sources:[];
-    const freshMonitor=monitor.filter(isVisibleCard);
-    const supporting=[...quanta,...controlShares,...shared,...(profile.collected||[]),...researchCards].filter(isVisibleCard);
-    // Once Monitor has a fresh retrieval, make that retrieval the visible News desk.
-    // Supporting Phi cards remain seed/context data instead of keeping old headlines pinned forever.
-    const all=freshMonitor.length?freshMonitor:supporting;
+    const all=[...shared,...(profile.collected||[])].filter(isVisibleCard);
     const merged=new Map();
 
     all.forEach(card=>{
@@ -180,8 +167,7 @@
     });
 
     const cards=[...merged.values()].sort((a,b)=>String(b.collectedAt).localeCompare(String(a.collectedAt)));
-    // Keep semantic seeds in shared storage. The feed filters them from display,
-    // but the fresh-story generator still needs them after this renderer starts.
+    set(KEYS.shared,cards);
 
     const legacy=get(KEYS.legacyStories,{});
     const storyIndex=get(KEYS.stories,{});
@@ -338,14 +324,6 @@
     return 'PERSONALIZED NEWS';
   }
 
-  function whyText(story){
-    const w=story?.quantWhy;if(!w)return '';
-    const seed=clean(w.seedTopic||story.searchQuery||''), topic=clean(story.searchQuery||'');
-    if(Number(w.distance)===0)return seed?('From your '+seed+' Quant'):'From your Quant';
-    if(seed&&topic&&seed.toLowerCase()!==topic.toLowerCase())return 'Quant path: '+seed+' → '+topic;
-    return seed?('Related to your '+seed+' Quant'):'Related through your Quant graph';
-  }
-
   function renderStoryCardState(key){
     const node=feed?.querySelector(`[data-story-card="${CSS.escape(key)}"]`);
     const story=state.storyIndex[key];
@@ -359,17 +337,15 @@
       const story=state.storyIndex[keyOf(card)];
       return `${story?.headline||card.title||''} ${story?.standfirst||card.extract||''} ${story?.similarQuery||card.searchQuery||''}`.toLowerCase().includes(term);
     });
-    count.textContent='Fresh index stories';
-    const retrieval=get(KEYS.monitorStatus,null);
-    const stamp=retrieval?.retrievedAt?new Date(retrieval.retrievedAt).toLocaleString():'';
-    syncLabel.textContent=retrieval?.state==='fresh'?`Monitor / SearXNG · retrieved ${stamp} · ${retrieval.count} stories`:retrieval?.state==='empty'?`Monitor / SearXNG · ${stamp} · no new stories returned`:retrieval?.state==='error'?`Monitor unavailable · ${retrieval.message||'request failed'} · showing saved stories`:retrieval?.state==='no-seeds'?'No Phi activity seeds available yet':state.cards.length?'Saved stories · no verified retrieval yet':'Reading your index for fresh stories';
+    count.textContent=`${cards.length} stor${cards.length===1?'y':'ies'}`;
+    syncLabel.textContent=`${state.cards.length} personalized stor${state.cards.length===1?'y':'ies'}`;
     if(!cards.length){
       feed.innerHTML=`<div class="empty-feed"><h2>${state.cards.length?'No stories match that filter':'Your personalized news desk is ready'}</h2><p>${state.cards.length?'Try a broader word.':'Views, searches and shares create subject signals. News Phi turns those signals into readable stories instead of displaying the activity log itself.'}</p>${state.cards.length?'':`<a href="https://www-infinity4.github.io/Omni-Phi/">Open Omni Phi</a>`}</div>`;
       return;
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p>${whyText(story)?`<p class="quant-why">${esc(whyText(story))}</p>`:''}<div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div></div></article>`;
+      return `<article class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
@@ -384,7 +360,7 @@
     if(!story)return;
     dialog.dataset.storyKey=key;
     const sources=(story.sources||[]).map(source=>`<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a><span>${esc(source.provider||'Source')}</span></li>`).join('');
-    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${whyText(story)?`<p class="quant-why">${esc(whyText(story))}</p>`:''}${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
+    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span></div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
     storyContent.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
     if(location.hash!==`#story=${encodeURIComponent(key)}`)history.replaceState(null,'',`#story=${encodeURIComponent(key)}`);
     if(!rerender)dialog.showModal();
@@ -400,25 +376,8 @@
   document.getElementById('closeStory').addEventListener('click',closeStory);
   dialog.addEventListener('click',event=>{if(event.target===dialog)closeStory()});
   search.addEventListener('input',render);
-  document.getElementById('refreshFeed').addEventListener('click',async()=>{
-    const button=document.getElementById('refreshFeed');
-    if(button.disabled)return;
-    button.disabled=true;button.textContent='Refreshing…';
-    try{
-      await window.NewsPhiQuantaCloud?.refresh?.();
-      await window.NewsPhiMonitor?.refresh?.();
-      state=synchronize();render();
-    }catch(error){
-      console.warn('Fresh News Phi refresh failed',error);
-      state=synchronize();render();
-    }finally{button.disabled=false;button.textContent='Refresh'}
-  });
+  document.getElementById('refreshFeed').addEventListener('click',()=>{state=synchronize();render()});
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
-  window.addEventListener('newsphi:monitor-feed',()=>{state=synchronize();render()});
-  window.addEventListener('newsphi:monitor-error',()=>{state=synchronize();render()});
-  window.addEventListener('phi:ingested',()=>{state=synchronize();render()});
-  window.addEventListener('phiShared:collection-change',()=>{state=synchronize();render()});
-  window.addEventListener('storage',event=>{if([KEYS.monitorCards,KEYS.quantaCloud,KEYS.shared,KEYS.controlShares,KEYS.omniProfile,KEYS.omniResearch,KEYS.monitorStatus].includes(event.key)){state=synchronize();render()}});
 
   const importedKey=importSharedCard();
   render();
