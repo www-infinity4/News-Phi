@@ -141,7 +141,8 @@
   }
 
   function isVisibleCard(card){
-    if(!card)return false;\n    if(card.generatedBy==='news-phi-interest-bridge'||card.ingestType)return false;
+    if(!card)return false;
+    if(card.generatedBy==='news-phi-interest-bridge'||card.ingestType)return false;
     if(card.kind==='share'&&!card.sourceBacked)return false;
     return Boolean(clean(card.title)&&clean(card.extract||card.body));
   }
@@ -151,7 +152,8 @@
     const profile=get(KEYS.omniProfile,{collected:[]});
     const research=get(KEYS.omniResearch,null);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
-    const monitor=get('newsPhi:monitorCards:v1',[]);\n    const all=[...shared,...monitor].filter(card=>card&&card.sourceBacked&&(card.retrievalVersion==='cloudflare-news-only-20260929'||card.generatedBy==='monitor-news')).filter(isVisibleCard);
+    const monitor=get('newsPhi:monitorCards:v1',[]);
+    const all=[...shared,...monitor].filter(card=>card&&card.sourceBacked&&(card.retrievalVersion==='cloudflare-news-only-20260929'||card.generatedBy==='monitor-news')).filter(isVisibleCard);
     const merged=new Map();
 
     all.forEach(card=>{
@@ -330,7 +332,7 @@
   }
 
   function render(){
-    const term=search.value.trim().toLowerCase();
+    const term=(search?.value||'').trim().toLowerCase();
     const cards=state.cards.filter(card=>{
       const story=state.storyIndex[keyOf(card)];
       return `${story?.headline||card.title||''} ${story?.standfirst||card.extract||''} ${story?.similarQuery||card.searchQuery||''}`.toLowerCase().includes(term);
