@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   const KEYS={shared:'phiShared:collection:v1',stories:'phiShared:storyIndex:v2',queue:'newsPhi:retrievalQueue:v2',ingest:'controlPhi:ingestQueue:v1',controlShares:'controlPhi:shareFeed:v1',config:'controlPhi:searchConfig:v1'};
-  const VERSION='cloudflare-live-20260929';
+  const VERSION='cloudflare-news-only-20260929';
   const SEARXNG='https://orange-brook-a2ac.marvaseater.workers.dev';
   const STOP=new Set(['about','after','again','also','and','are','because','before','being','from','have','into','more','news','post','shared','source','that','their','these','they','this','through','what','when','where','which','with','would','your','infinity','phi','http','https','www','com']);
   const get=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
@@ -53,7 +53,7 @@
 
   async function resolveJob(job){
     const terms=searchTerms(job),query=terms.join(' ');if(query.length<3)return null;
-    const settled=await Promise.allSettled([wikipedia(query),duckDuckGo(query),crossref(query),searxng(query)]),sources=rankSources(job,settled.flatMap(result=>result.status==='fulfilled'?result.value:[])).slice(0,5);if(!sources.length)return null;
+    const live=await searxng(query),sources=rankSources(job,live).slice(0,5);if(!sources.length)return null;
     const lead=sources[0],imageSource=sources.find(source=>source.image&&overlap(`${source.title} ${source.excerpt}`,query)>=Math.min(2,terms.length));
     return {id:`retrieved-${hash(job.jobKey||query)}`,storyKey:`retrieved:${hash(job.jobKey||query)}`,kind:job.kind,title:lead.title,extract:sources.slice(0,3).map(source=>clip(source.excerpt)).filter(Boolean).join(' '),url:lead.url,domain:lead.provider,provider:lead.provider,publishedAt:lead.publishedAt||'',collectedAt:job.collectedAt||new Date().toISOString(),searchQuery:query,sources,image:imageSource?.image||'',imageVerified:Boolean(imageSource),sourceBacked:true,retrievalVersion:VERSION};
   }
