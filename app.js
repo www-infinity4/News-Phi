@@ -373,8 +373,8 @@
 
   document.getElementById('closeStory').addEventListener('click',closeStory);
   dialog.addEventListener('click',event=>{if(event.target===dialog)closeStory()});
-  search.addEventListener('input',render);
-  document.getElementById('refreshFeed').addEventListener('click',()=>{state=synchronize();render()});
+  search?.addEventListener('input',render);
+
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
   window.addEventListener('newsphi:monitor-feed',()=>{state=synchronize();render()});
 
