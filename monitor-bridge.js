@@ -1,6 +1,10 @@
 (function(){
   'use strict';
   const COLLECTION='phiShared:collection:v1';
+  const QUANTA='newsPhi:quantaCloudCards:v1';
+  const OMNI_PROFILE='omniPhi:profile:v1';
+  const OMNI_RESEARCH='omniPhi:lastResearch:v1';
+  const CONTROL_SHARES='controlPhi:shareFeed:v1';
   const ENDPOINT_KEY='newsPhi:monitorEndpoint:v1';
   const MONITOR_CARDS='newsPhi:monitorCards:v1';
   const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
@@ -8,9 +12,17 @@
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
 
   function chosenTopics(){
-    const cards=read(COLLECTION,[]);
+    const profile=read(OMNI_PROFILE,{collected:[]});
+    const research=read(OMNI_RESEARCH,null);
+    const cards=[
+      ...read(QUANTA,[]),
+      ...read(CONTROL_SHARES,[]),
+      ...read(COLLECTION,[]),
+      ...(profile.collected||[]),
+      ...(research?.sources||[])
+    ];
     const out=[];
-    for(const card of Array.isArray(cards)?cards:[]){
+    for(const card of cards){
       const topic=clean(card.searchQuery||card.sourceTitle||card.title);
       if(topic&&!out.includes(topic))out.push(topic);
     }
