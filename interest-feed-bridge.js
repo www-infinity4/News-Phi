@@ -10,12 +10,12 @@
     const jobs=read(QUEUE_KEY,[]),byKey=new Map(jobs.map(job=>[job.jobKey,job]));
     read(SIGNAL_KEY,[]).filter(Boolean).forEach(signal=>{
       const signalKind=clean(signal.kind)||'view';
-      if(signalKind!=='search'&&signalKind!=='share')return;
-      const subject=signalKind==='search'?clean(signal.query):clean(signal.program||signal.title||signal.channel);
+      if(!['search','share','collect','view'].includes(signalKind))return;
+      const subject=signalKind==='search'?clean(signal.query):clean(signal.program||signal.title||signal.topic||signal.query||signal.channel);
       if(!subject)return;
-      const kind=signalKind==='search'?'search':'share',jobKey=`${kind}:${slug(signal.topicKey||subject)}`;
+      const kind=signalKind,jobKey=`${kind}:${slug(signal.topicKey||subject)}`;
       const previous=byKey.get(jobKey)||{},at=Number(signal.lastAt||Date.parse(signal.collectedAt||signal.createdAt||'')||Date.now());
-      byKey.set(jobKey,{...previous,jobKey,kind,subject,query:clean(signal.query||`${subject} ${signal.channel||''}`),sourceUrl:clean(signal.url),collectedAt:new Date(at).toISOString(),signalCount:(Number(previous.signalCount)||0)+Math.max(1,Number(signal.hits)||1),status:previous.status==='published'?'published':'indexed'});
+      byKey.set(jobKey,{...previous,jobKey,kind,subject,query:clean(signal.query||`${subject} ${signal.channel||''}`),sourceUrl:clean(signal.url),collectedAt:new Date(at).toISOString(),signalCount:(Number(previous.signalCount)||0)+Math.max(1,Number(signal.hits)||1),status:at>Number(Date.parse(previous.publishedAt||'')||0)?'indexed':(previous.status||'indexed')});
     });
     const indexed=[...byKey.values()].sort((a,b)=>String(b.collectedAt).localeCompare(String(a.collectedAt))).slice(0,500);
     write(QUEUE_KEY,indexed);return indexed;
