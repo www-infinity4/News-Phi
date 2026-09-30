@@ -58,7 +58,7 @@
     const endpoint=clean(localStorage.getItem(ENDPOINT_KEY)||'https://monitor-phi.marvaseater.workers.dev');
     if(!endpoint)return null;
     const seeds=chosenTopics();
-    if(!seeds.length){write(MONITOR_CARDS,[]);write(MONITOR_STATUS,{state:'no-seeds',retrievedAt:new Date().toISOString(),count:0,source:'Monitor / SearXNG'});window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{status:'no-seeds',cards:[]}}));return null;}
+    // Always call Monitor. When browser-local subjects are empty, the Worker falls back to its persisted D1 Quant graph.
     try{
       const response=await fetch(endpoint.replace(/\/$/,'')+'/p/news/feed',{
         method:'POST',cache:'no-store',headers:{'content-type':'application/json','cache-control':'no-cache'},
