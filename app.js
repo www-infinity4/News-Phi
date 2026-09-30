@@ -376,6 +376,7 @@
   search.addEventListener('input',render);
   document.getElementById('refreshFeed').addEventListener('click',()=>{state=synchronize();render()});
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
+  window.addEventListener('newsphi:monitor-feed',()=>{state=synchronize();render()});
 
   const importedKey=importSharedCard();
   render();
