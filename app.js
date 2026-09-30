@@ -151,7 +151,7 @@
     const profile=get(KEYS.omniProfile,{collected:[]});
     const research=get(KEYS.omniResearch,null);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
-    const all=[...shared,...(profile.collected||[])].filter(isVisibleCard);
+    const all=shared.filter(card=>card&&card.sourceBacked&&card.retrievalVersion==='cloudflare-news-only-20260929').filter(isVisibleCard);
     const merged=new Map();
 
     all.forEach(card=>{
@@ -167,13 +167,11 @@
     });
 
     const cards=[...merged.values()].sort((a,b)=>String(b.collectedAt).localeCompare(String(a.collectedAt)));
-    set(KEYS.shared,cards);
-
-    const legacy=get(KEYS.legacyStories,{});
+    const legacy={};
     const storyIndex=get(KEYS.stories,{});
     cards.forEach(card=>{
       const key=keyOf(card);
-      storyIndex[key]=makeBaseStory(card,storyIndex[key]||legacy[key]||{});
+      storyIndex[key]=makeBaseStory(card,storyIndex[key]||{});
     });
     set(KEYS.stories,storyIndex);
     return {cards,storyIndex};
