@@ -52,13 +52,14 @@
     const queued=[...byKey.values()].sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||''))).slice(0,500);
     write(QUEUE,queued);
     window.dispatchEvent(new CustomEvent('phi:ingested',{detail:{source:'quanta-cloud',count:cards.length}}));
+    window.dispatchEvent(new CustomEvent('newsphi:quanta-cloud-ready',{detail:{count:cards.length,jobs:queued.length}}));
     window.dispatchEvent(new Event('newsphi:run-retrieval'));
     return queued;
   }
 
   async function refresh(){
     const bridge=window.StarQuestCloudLedger;
-    if(!bridge?.authenticatedFetch)return {ok:false,reason:'signed_out'};
+    if(!bridge?.authenticatedFetch){window.dispatchEvent(new CustomEvent('newsphi:quanta-cloud-error',{detail:{reason:'signed_out'}}));return {ok:false,reason:'signed_out'};}
     const response=await bridge.authenticatedFetch(ENDPOINT,{cache:'no-store'});
     const payload=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(payload.error||'quanta_collect_feed_failed');
