@@ -74,6 +74,8 @@
   function titleFromCard(card){
     let title=clean(card.title||'');
     title=title
+      .replace(/\.(?:jpe?g|png|webp|gif)$/i,'')
+      .replace(/\s*\(\d{7,}\)\s*$/,'')
       .replace(/\s*[·|—-]\s*(Infinity Channel|Infinity TV)$/i,'')
       .replace(/\s*[·|—-]\s*(USA Up All Night|AMC Classic Movies|Motor TV|Comedy Central)$/i,'')
       .replace(/^Shared\s+(orange\s+)?card\s*[:—-]?\s*/i,'')
