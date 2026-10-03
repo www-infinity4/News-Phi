@@ -22,8 +22,14 @@
     const semantic=read('newsPhi:semanticSeedIndex:v1',{});
     for(const seed of Object.values(semantic.seeds||{})){const topic=topicFrom(seed);if(topic)rows.push({topic,at:at(seed)})}
     const research=read('omniPhi:lastResearch:v1',null);if(research?.query)rows.push({topic:subject(research.query),at:at(research)});
-    const newest=new Map();for(const row of rows){const key=row.topic.toLowerCase();if(!newest.has(key)||row.at>newest.get(key).at)newest.set(key,row)}
-    const indexed=[...newest.values()].sort((a,b)=>b.at-a.at).slice(0,60);write(INDEX,indexed);
+    const newest=new Map(),now=Date.now();
+    for(const row of rows){
+      if(row.topic.length<3||!/[a-z]/i.test(row.topic))continue;
+      const key=row.topic.toLowerCase(),prior=newest.get(key);
+      if(!prior)newest.set(key,{topic:row.topic,at:row.at,count:1});else{prior.count++;if(row.at>prior.at)prior.at=row.at}
+    }
+    const weight=x=>(x.at?Math.max(0,1-(now-x.at)/(30*86400000)):0)*3+Math.min(x.count,5)*0.4;
+    const indexed=[...newest.values()].sort((a,b)=>weight(b)-weight(a)||b.at-a.at).slice(0,60);write(INDEX,indexed);
     return indexed.map(x=>x.topic).slice(0,12);
   }
   function publication(result,now=Date.now()){
@@ -42,12 +48,21 @@
     const published=publication(result,now);let domain='';try{domain=new URL(url).hostname.replace(/^www\./,'')}catch{return null}
     return {id:'direct-news:'+url,storyKey:'news:'+url,title,extract,url,image:clean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),imageVerified:Boolean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),domain,provider:domain,publishedAt:published.at?new Date(published.at).toISOString():'',publishedLabel:published.label,retrievedAt:new Date(now).toISOString(),collectedAt:published.at?new Date(published.at).toISOString():new Date(now).toISOString(),searchQuery:topic,sourceBacked:true,generatedBy:'monitor-news',retrievalVersion:'indexed-fresh-news-v3'};
   }
+  const STOP=/^(the|and|for|with|from|into|about|this|that|news|new|how|what|why|who|are|was|vs)$/;
+  const terms=value=>[...new Set(clean(value).toLowerCase().replace(/[^a-z0-9' ]+/g,' ').split(/\s+/).filter(w=>w.length>2&&!STOP.test(w)))];
+  function relevance(card,topic){
+    const t=terms(topic);if(!t.length)return 1;
+    const head=(card.title+' '+card.domain).toLowerCase(),body=card.extract.toLowerCase();
+    return t.reduce((n,w)=>n+(head.includes(w)?2:body.includes(w)?1:0),0)/(t.length*2);
+  }
+  const isEra=topic=>/\b(1[89]\d\d|20[01]\d|19\d0s|20[01]0s|history|era|vintage|retro|classic|legacy)\b/i.test(topic);
   async function requestTopic(topic,range){
-    const url=new URL(ENDPOINT);url.search=new URLSearchParams({q:topic,format:'json',categories:'news',time_range:range,safesearch:'1',_fresh:String(Date.now())});
+    const url=new URL(ENDPOINT);const params={q:topic,format:'json',categories:'news',safesearch:'1',_fresh:String(Date.now())};if(range)params.time_range=range;url.search=new URLSearchParams(params);
     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),18000);
-    try{const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('News search '+response.status);const payload=await response.json();return (payload.results||[]).map(x=>normalize(x,topic)).filter(Boolean)}finally{clearTimeout(timer)}
+    try{const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('News search '+response.status);const payload=await response.json();return (payload.results||[]).map(x=>normalize(x,topic)).filter(Boolean).filter(c=>relevance(c,topic)>=0.34).map(c=>{c.relevance=Math.round(relevance(c,topic)*100)/100;return c})}finally{clearTimeout(timer)}
   }
   async function searchTopic(topic){
+    if(isEra(topic))return (await requestTopic(topic,'year').catch(()=>requestTopic(topic,''))).slice(0,8);
     const today=await requestTopic(topic,'day');if(today.length>=3)return today.slice(0,8);
     const week=await requestTopic(topic,'week').catch(()=>[]);return [...today,...week].slice(0,8);
   }
@@ -59,8 +74,9 @@
   }
   function merge(batches){
     const seenUrl=new Set(),seenTitle=new Set(),cards=[];
-    const all=batches.flat().sort((a,b)=>(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||String(b.retrievedAt).localeCompare(String(a.retrievedAt)));
-    for(const card of all){const titleKey=card.title.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();if(seenUrl.has(card.url)||seenTitle.has(titleKey))continue;seenUrl.add(card.url);seenTitle.add(titleKey);cards.push(card);if(cards.length>=40)break}
+    const all=batches.flat().sort((a,b)=>(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||Number(Boolean(b.image))-Number(Boolean(a.image))||(b.relevance||0)-(a.relevance||0)||String(b.retrievedAt).localeCompare(String(a.retrievedAt)));
+    const perTopic=new Map();
+    for(const card of all){const used=perTopic.get(card.searchQuery)||0;if(used>=8)continue;const titleKey=card.title.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();if(seenUrl.has(card.url)||seenTitle.has(titleKey))continue;seenUrl.add(card.url);seenTitle.add(titleKey);perTopic.set(card.searchQuery,used+1);cards.push(card);if(cards.length>=40)break}
     return cards;
   }
   let running=null;
