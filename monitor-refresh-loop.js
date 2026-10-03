@@ -79,20 +79,65 @@
     for(const card of all){const used=perTopic.get(card.searchQuery)||0;if(used>=8)continue;const titleKey=card.title.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();if(seenUrl.has(card.url)||seenTitle.has(titleKey))continue;seenUrl.add(card.url);seenTitle.add(titleKey);perTopic.set(card.searchQuery,used+1);cards.push(card);if(cards.length>=40)break}
     return cards;
   }
+  const HIDDEN='newsPhi:hiddenStories:v1',MODE='newsPhi:feedMode:v1',WIPED='newsPhi:feedWipedAt:v1';
+  const DAY=86400000,TTL=7*DAY,BATCH=20,MAX_FEED=200,INTERVALS={daily:DAY,weekly:7*DAY};
+  const cardKey=card=>card?.storyKey||card?.url||card?.id||'';
+  function hiddenMap(now=Date.now()){
+    const map=read(HIDDEN,{}),out={};
+    for(const [key,time] of Object.entries(map&&typeof map==='object'?map:{}))if(now-Number(time)<30*DAY)out[key]=Number(time);
+    return out;
+  }
+  function hide(key){const map=hiddenMap();map[key]=Date.now();write(HIDDEN,map);write(CARDS,read(CARDS,[]).filter(c=>cardKey(c)!==key));window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{hidden:key}}))}
+  function setMode(mode){write(MODE,INTERVALS[mode]?mode:'off');if(!read(WIPED,0))write(WIPED,Date.now())}
+  function applyPolicy(now=Date.now()){
+    const interval=INTERVALS[read(MODE,'off')],last=Number(read(WIPED,0))||0;
+    if(interval&&last&&now-last>=interval){write(CARDS,[]);write(WIPED,now)}
+    else if(interval&&!last)write(WIPED,now);
+  }
+  function recency(card,now){const t=Date.parse(card.publishedAt)||Date.parse(card.firstSeenAt)||now;return Math.max(0,1-(now-t)/TTL)}
+  const baseRank=(card,now)=>Math.round(((card.relevance||0)*50+recency(card,now)*50)*100)/100;
+  function stack(stored,found,now=Date.now()){
+    const hidden=hiddenMap(now),stack=new Map();
+    for(const card of stored){const key=cardKey(card);if(!key||hidden[key])continue;const age=now-(Date.parse(card.firstSeenAt)||now);if(age>=TTL)continue;stack.set(key,card)}
+    const fresh=[];
+    for(const card of found.flat()){
+      const key=cardKey(card);if(!key||hidden[key])continue;
+      const prior=stack.get(key);
+      if(prior){stack.set(key,{...prior,relevance:Math.max(prior.relevance||0,card.relevance||0),retrievedAt:card.retrievedAt,revisitedAt:card.retrievedAt});continue}
+      if(!fresh.some(c=>cardKey(c)===key))fresh.push({...card,firstSeenAt:new Date(now).toISOString()});
+    }
+    const titles=new Set([...stack.values()].map(c=>String(c.title).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()));
+    const accepted=fresh.filter(c=>{const t=String(c.title).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();if(titles.has(t))return false;titles.add(t);return true});
+    accepted.forEach(c=>{c.rank=baseRank(c,now)});
+    accepted.sort((a,b)=>b.rank-a.rank);
+    const added=accepted.slice(0,BATCH);
+    added.forEach((c,i)=>{c.rank=Math.round((c.rank+1000-i*0.001)*1000)/1000;c.isNew=true});
+    const older=[...stack.values()].map(c=>({...c,isNew:false,rank:baseRank(c,now)})).sort((a,b)=>b.rank-a.rank);
+    return {cards:[...added,...older].slice(0,MAX_FEED),added:added.length};
+  }
   let running=null;
   function refresh(){
     if(running)return running;
     running=(async()=>{
+      applyPolicy();
       await cloudSubjects();const seeds=topics();if(!seeds.length)return {stories:read(CARDS,[]),seeds};
       write(STATUS,{state:'loading',checkedAt:new Date().toISOString(),seeds:seeds.length});
+      const stored=read(CARDS,[]),known=new Set(stored.map(cardKey)),hidden=hiddenMap();
       const results=await Promise.allSettled(seeds.slice(0,8).map(searchTopic));
-      const cards=merge(results.filter(x=>x.status==='fulfilled').map(x=>x.value));
-      if(results.every(x=>x.status==='rejected')){write(STATUS,{state:'error',checkedAt:new Date().toISOString()});return {stories:read(CARDS,[]),seeds}}
-      write(CARDS,cards);write(STATUS,{state:cards.length?'fresh':'empty',retrievedAt:new Date().toISOString(),count:cards.length,seeds:seeds.length});
+      if(results.every(x=>x.status==='rejected')){write(STATUS,{state:'error',checkedAt:new Date().toISOString()});return {stories:stored,seeds}}
+      let found=results.filter(x=>x.status==='fulfilled').map(x=>x.value);
+      const unseen=()=>found.flat().filter(c=>!known.has(cardKey(c))&&!hidden[cardKey(c)]).length;
+      for(const range of ['month','year']){
+        if(unseen()>=BATCH)break;
+        const older=await Promise.allSettled(seeds.slice(0,8).map(t=>requestTopic(t,range)));
+        found=found.concat(older.filter(x=>x.status==='fulfilled').map(x=>x.value));
+      }
+      const {cards,added}=stack(stored,found);
+      write(CARDS,cards);write(STATUS,{state:cards.length?'fresh':'empty',retrievedAt:new Date().toISOString(),count:cards.length,added,seeds:seeds.length});
       window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{stories:cards,seeds,direct:true}}));return {stories:cards,seeds};
     })().finally(()=>running=null);return running;
   }
-  window.NewsPhiDirect={refresh,topics,publication,normalize,merge};
+  window.NewsPhiDirect={refresh,hide,setMode,applyPolicy,stack,topics,publication,normalize,merge};
   let timer=0;const schedule=(delay=180)=>{clearTimeout(timer);timer=setTimeout(()=>void refresh().catch(()=>{}),delay)};
   for(const event of ['focus','controlphi:shared','phi:ingested','newsphi:run-retrieval','quantaPhiHistoryAdded','phiShared:collection-change'])window.addEventListener(event,()=>schedule());
   window.addEventListener('storage',event=>{if(SOURCES.includes(event.key||''))schedule()});

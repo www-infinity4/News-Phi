@@ -157,7 +157,8 @@
     const profile=get(KEYS.omniProfile,{collected:[]});
     const research=get(KEYS.omniResearch,null);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
-    const monitor=get('newsPhi:monitorCards:v1',[]);
+    const hiddenStories=get('newsPhi:hiddenStories:v1',{});
+    const monitor=get('newsPhi:monitorCards:v1',[]).filter(card=>!hiddenStories[card.storyKey||card.url||card.id]);
     const quanta=get('newsPhi:quantaCloudCards:v1',[]);
     const localQuanta=get('quantaPhiCollected',[]).map(card=>({id:'quanta:'+card.key,storyKey:'quanta:'+card.key,title:card.title,extract:card.story,url:card.sourceUrl,image:card.type==='Image'?card.media:'',imageVerified:card.type==='Image',sourceBacked:Boolean(card.sourceUrl),collectedAt:card.collectedAt,domain:'QuantaPhi'}));
     const all=[...shared,...quanta,...localQuanta,...monitor].filter(card=>card&&card.sourceBacked).filter(isVisibleCard);
@@ -175,7 +176,7 @@
       });
     });
 
-    const cards=[...merged.values()].sort((a,b)=>Number(b.generatedBy==='monitor-news')-Number(a.generatedBy==='monitor-news')||(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||String(b.collectedAt).localeCompare(String(a.collectedAt)));
+    const cards=[...merged.values()].sort((a,b)=>Number(b.generatedBy==='monitor-news')-Number(a.generatedBy==='monitor-news')||(b.rank||0)-(a.rank||0)||(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||String(b.collectedAt).localeCompare(String(a.collectedAt)));
     const legacy={};
     const storyIndex=get(KEYS.stories,{});
     cards.forEach(card=>{
@@ -352,10 +353,11 @@
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div></div></article>`;
+      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}">Hide story</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
+    feed.querySelectorAll('[data-hide]').forEach(button=>button.addEventListener('click',()=>{window.NewsPhiDirect?.hide(button.dataset.hide);state=synchronize();render()}));
     cards.slice(0,6).forEach(card=>{
       const story=state.storyIndex[keyOf(card)];
       if(story&&!story.enriched&&!story.enriching)setTimeout(()=>void enrichStory(story.storyKey),80);
