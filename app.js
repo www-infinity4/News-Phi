@@ -142,7 +142,7 @@
 
   function isVisibleCard(card){
     if(!card)return false;
-    if(card.generatedBy==='news-phi-interest-bridge'||card.ingestType)return false;
+    if((card.generatedBy==='news-phi-interest-bridge'||card.ingestType)&&!card.sourceBacked)return false;
     if(card.kind==='share'&&!card.sourceBacked)return false;
     return Boolean(clean(card.title)&&clean(card.extract||card.body));
   }
@@ -153,7 +153,9 @@
     const research=get(KEYS.omniResearch,null);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
     const monitor=get('newsPhi:monitorCards:v1',[]);
-    const all=[...shared,...monitor].filter(card=>card&&card.sourceBacked&&(card.retrievalVersion==='cloudflare-news-only-20260929'||card.generatedBy==='monitor-news')).filter(isVisibleCard);
+    const quanta=get('newsPhi:quantaCloudCards:v1',[]);
+    const localQuanta=get('quantaPhiCollected',[]).map(card=>({id:'quanta:'+card.key,storyKey:'quanta:'+card.key,title:card.title,extract:card.story,url:card.sourceUrl,image:card.type==='Image'?card.media:'',imageVerified:card.type==='Image',sourceBacked:Boolean(card.sourceUrl),collectedAt:card.collectedAt,domain:'QuantaPhi'}));
+    const all=[...shared,...quanta,...localQuanta,...monitor].filter(card=>card&&card.sourceBacked).filter(isVisibleCard);
     const merged=new Map();
 
     all.forEach(card=>{
@@ -378,7 +380,7 @@
   search?.addEventListener('input',render);
 
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
-  window.addEventListener('newsphi:monitor-feed',()=>{state=synchronize();render()});
+  for(const event of ['newsphi:monitor-feed','newsphi:feed-updated','newsphi:quanta-cloud-ready','phi:ingested'])window.addEventListener(event,()=>{state=synchronize();render()});
 
   const importedKey=importSharedCard();
   render();
