@@ -6,10 +6,10 @@
     queued=true;
     requestAnimationFrame(()=>{
       queued=false;
-      window.dispatchEvent(new CustomEvent('controlphi:shared',{detail:{source:'newsphi-fresh-retrieval'}}));
+      window.dispatchEvent(new CustomEvent('newsphi:feed-updated',{detail:{source:'newsphi-fresh-retrieval'}}));
     });
   }
   window.addEventListener('newsphi:retrieval-upgraded',refresh);
   window.addEventListener('newsphi:monitor-feed',refresh);
-  setTimeout(()=>{try{window.NewsPhiDirect?.refresh?.()}catch(_){}},4200);
+
 })();
