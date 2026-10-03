@@ -175,7 +175,7 @@
       });
     });
 
-    const cards=[...merged.values()].sort((a,b)=>Number(b.generatedBy==='monitor-news')-Number(a.generatedBy==='monitor-news')||String(b.publishedAt||b.collectedAt).localeCompare(String(a.publishedAt||a.collectedAt)));
+    const cards=[...merged.values()].sort((a,b)=>Number(b.generatedBy==='monitor-news')-Number(a.generatedBy==='monitor-news')||(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||String(b.collectedAt).localeCompare(String(a.collectedAt)));
     const legacy={};
     const storyIndex=get(KEYS.stories,{});
     cards.forEach(card=>{
@@ -352,7 +352,7 @@
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div></div></article>`;
+      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
