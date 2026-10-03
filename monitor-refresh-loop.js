@@ -92,7 +92,7 @@
     return {stories:cards,seeds};
   }
 
-  
+
   window.NewsPhiDirect={refresh,topics};
   let timer=0,running=false;
   const schedule=(delay=120)=>{clearTimeout(timer);timer=setTimeout(async()=>{if(running)return;running=true;try{await refresh()}catch(_){}finally{running=false}},delay)};
