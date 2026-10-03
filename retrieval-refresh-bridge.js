@@ -11,4 +11,5 @@
   }
   window.addEventListener('newsphi:retrieval-upgraded',refresh);
   window.addEventListener('newsphi:monitor-feed',refresh);
+  setTimeout(()=>{try{window.NewsPhiDirect?.refresh?.()}catch(_){}},4200);
 })();
