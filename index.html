@@ -29,6 +29,7 @@
       <p class="intro">News Phi grows from what you actually explore. Tapping a program records a view signal, searches add subjects you want to investigate, tracked links record what you actually followed, and completed shares count as the strongest signal. News Phi turns those choices into reusable story cards and brings repeated interests back toward the top, giving you an educational feed shaped by your own viewing and research instead of a generic list.</p>
     </section>
 
+<div class="feed-controls"><button type="button" id="refreshFeed">Refresh news</button><label>Start fresh <select id="feedMode"><option value="off">Never wipe (stories expire after 7 days)</option><option value="daily">Fresh news once a day</option><option value="weekly">Fresh news once a week</option></select></label></div>
 <section class="feed" id="feed" aria-live="polite">
       <div class="loading-card">Synchronizing collected cards…</div>
     </section>
@@ -57,6 +58,7 @@
   <script src="news-card-image-resolver.js?v=20261002-images1"></script>
   <script src="news-image-integrity.js?v=20261002-images1"></script>
   <script src="user-index-bridge.js?v=20261002-index1"></script>
+  <script src="feed-controls.js?v=20261003-revolve1"></script>
   <script src="news-interactions.js?v=20261002-fresh1"></script>
 </body>
 </html>

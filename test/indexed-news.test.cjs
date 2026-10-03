@@ -7,3 +7,12 @@ test('indexed search words request today news and publish source articles rather
 test('publication metadata ranks freshest articles first and missing dates do not impersonate a publication date',()=>{const {api}=setup({},null),now=Date.now();const cards=[{title:'older',url:'https://a.example/old',content:'old',metadata:'5 hours ago'},{title:'unknown',url:'https://b.example/story',content:'unknown'},{title:'fresh',url:'https://a.example/new',content:'new',metadata:'12 minutes ago'}].map(x=>api.normalize(x,'Iran',now));const merged=api.merge([cards]);assert.equal(merged[0].title,'fresh');assert.equal(merged[2].publishedAt,'');assert.equal(merged[2].publishedLabel,'')});
 test('collected filenames become clean indexed subjects and generated news does not seed itself',()=>{const {api}=setup({'quantaPhiCollected':[{title:'Kenny Rogers (7787975040).jpg'}],'phiShared:collection:v1':[{title:'Generated headline',generatedBy:'monitor-news'}]},null);assert.deepEqual(Array.from(api.topics()),['Kenny Rogers'])});
 test('a failed retrieval retains the last successful feed',async()=>{const {api,data}=setup({'quantaPhiBuildHistoryV1':[{query:'Iran'}],'newsPhi:monitorCards:v1':[{title:'Saved story'}]},async()=>{throw Error('offline')});const out=await api.refresh();assert.equal(out.stories[0].title,'Saved story');assert.equal(JSON.parse(data.get('newsPhi:monitorStatus:v1')).state,'error')});
+test('refresh seeds up to 20 new cards on top, keeps older, drops hidden and expired',()=>{
+ const {api}=setup({},null),now=Date.now(),mk=(n,extra={})=>({title:'Story '+n,url:'https://x.example/'+n,extract:'e',relevance:1,publishedAt:new Date(now-n*3600000).toISOString(),retrievedAt:new Date(now).toISOString(),...extra});
+ const stored=[mk(100,{firstSeenAt:new Date(now-DAYS(1)).toISOString()}),mk(101,{firstSeenAt:new Date(now-DAYS(8)).toISOString()}),mk(102,{firstSeenAt:new Date(now-DAYS(1)).toISOString()})];
+ function DAYS(n){return n*86400000}
+ const found=[[...Array(25).keys()].map(n=>mk(n+1))];
+ const out=api.stack(stored,found,now);
+ assert.equal(out.added,20);assert.equal(out.cards[0].isNew,true);assert.equal(out.cards[19].isNew,true);assert.equal(out.cards[20].isNew,false);
+ assert.ok(!out.cards.some(c=>c.title==='Story 101'));assert.ok(out.cards.some(c=>c.title==='Story 100'));
+});
