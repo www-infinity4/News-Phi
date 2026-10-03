@@ -53,7 +53,7 @@
         let domain=clean(result.engine||result.source||result.provider||'');
         if(!domain){try{domain=new URL(url).hostname.replace(/^www\./,'')}catch{}}
         return {
-          id:'direct-news-'+Math.random().toString(36).slice(2)+'-'+Date.now(),
+          id:'direct-news:'+url,
           storyKey:'news:'+url,
           title,
           extract,
@@ -74,10 +74,10 @@
   }
 
   async function refresh(){
-    const seeds=topics(),batches=[];
-    for(const topic of seeds.slice(0,8)){
-      try{batches.push(...await searchTopic(topic))}catch(_){}
-    }
+    const seeds=topics();if(!seeds.length)return {stories:read(MONITOR_CARDS,[]),seeds};
+    const results=await Promise.allSettled(seeds.slice(0,8).map(searchTopic));
+    const batches=results.filter(x=>x.status==='fulfilled').flatMap(x=>x.value);
+    if(results.every(x=>x.status==='rejected'))return {stories:read(MONITOR_CARDS,[]),seeds};
     const seenUrl=new Set(),seenTitle=new Set(),cards=[];
     for(const card of batches){
       const titleKey=card.title.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -92,7 +92,7 @@
     return {stories:cards,seeds};
   }
 
-  if(window.NewsPhiMonitor)window.NewsPhiMonitor.refresh=refresh;
+  
   window.NewsPhiDirect={refresh,topics};
   let timer=0,running=false;
   const schedule=(delay=120)=>{clearTimeout(timer);timer=setTimeout(async()=>{if(running)return;running=true;try{await refresh()}catch(_){}finally{running=false}},delay)};
