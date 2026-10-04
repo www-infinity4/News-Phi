@@ -121,11 +121,11 @@
     if(running)return running;
     running=(async()=>{
       applyPolicy();
-      await cloudSubjects();const seeds=topics();if(!seeds.length){window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));return {stories:read(CARDS,[]),seeds};}
+      await cloudSubjects();const seeds=topics();if(!seeds.length){if(window.NewsPhiMonitor?.refresh)await window.NewsPhiMonitor.refresh();else window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));return {stories:read(CARDS,[]),seeds};}
       write(STATUS,{state:'loading',checkedAt:new Date().toISOString(),seeds:seeds.length});
       const stored=read(CARDS,[]),known=new Set(stored.map(cardKey)),hidden=hiddenMap();
       const results=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t))); 
-      if(results.every(x=>x.status==='rejected')){write(STATUS,{state:'error',checkedAt:new Date().toISOString(),message:'Direct news search unavailable; trying Monitor fallback'});window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));return {stories:stored,seeds}}
+      if(results.every(x=>x.status==='rejected')){write(STATUS,{state:'error',checkedAt:new Date().toISOString(),message:'Direct news search unavailable; trying Monitor fallback'});if(window.NewsPhiMonitor?.refresh)await window.NewsPhiMonitor.refresh();else window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));return {stories:read(CARDS,stored),seeds}}
       let found=results.filter(x=>x.status==='fulfilled').map(x=>x.value);
       const unseen=()=>found.flat().filter(c=>!known.has(cardKey(c))&&!hidden[cardKey(c)]).length;
       for(const page of [2,3]){
@@ -133,7 +133,7 @@
         const older=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t,page)));
         found=found.concat(older.filter(x=>x.status==='fulfilled').map(x=>x.value));
       }
-      if(!found.flat().length){window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'))}
+      if(!found.flat().length){if(window.NewsPhiMonitor?.refresh){await window.NewsPhiMonitor.refresh();return {stories:read(CARDS,stored),seeds}}window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'))}
       const {cards,added}=stack(stored,found);
       write(CARDS,cards);write(STATUS,{state:added?'fresh':cards.length?'no-new':'empty',retrievedAt:new Date().toISOString(),count:cards.length,added,seeds:seeds.length,windowDays:7});
       window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{stories:cards,seeds,direct:true}}));return {stories:cards,seeds};
