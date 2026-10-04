@@ -30,7 +30,7 @@ test('tracking variants are one story across providers and refreshes; original s
  const {api}=setup({'phiShared:interestSignals:v1':[{kind:'share',title:'Iran',url:'https://www.x.example/original?utm_source=share'}]},async()=>({ok:true,json:async()=>({results:[
   {title:'Iran original',url:'https://x.example/original?fbclid=a',content:'Iran reporting',metadata:'1 hour ago'},
   {title:'Iran new',url:'https://www.x.example/new/?utm_campaign=one#top',content:'Iran current reporting',metadata:'1 hour ago'}]})}));
- const rows=await api.requestTopic('Iran','day');assert.equal(rows.length,1);assert.equal(rows[0].url,'https://x.example/new');
+ const rows=await api.requestTopic('Iran','day');assert.equal(rows.length,1);assert.equal(rows[0].canonicalUrl,'https://x.example/new');assert.equal(rows[0].url,'https://www.x.example/new/?utm_campaign=one#top');
  const stored=[{...rows[0],url:'https://www.x.example/new/?utm_source=old',storyKey:'monitor:legacy'}];
  const result=api.stack(stored,[rows]);assert.equal(result.added,0);assert.equal(result.cards.length,1);
 });
