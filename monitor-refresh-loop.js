@@ -80,8 +80,8 @@
     for(const card of all){const used=perTopic.get(card.searchQuery)||0;if(used>=8)continue;const titleKey=card.title.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();if(seenUrl.has(card.url)||seenTitle.has(titleKey))continue;seenUrl.add(card.url);seenTitle.add(titleKey);perTopic.set(card.searchQuery,used+1);cards.push(card);if(cards.length>=40)break}
     return cards;
   }
-  const HIDDEN='newsPhi:hiddenStories:v1',MODE='newsPhi:feedMode:v1',WIPED='newsPhi:feedWipedAt:v1';
-  const DAY=86400000,TTL=7*DAY,BATCH=20,MAX_FEED=200,INTERVALS={daily:DAY,weekly:7*DAY};
+  const HIDDEN='newsPhi:hiddenStories:v1',WIPED='newsPhi:feedWipedAt:v1';
+  const DAY=86400000,TTL=7*DAY,BATCH=20,MAX_FEED=200;
   const cardKey=card=>card?.storyKey||card?.url||card?.id||'';
   function hiddenMap(now=Date.now()){
     const map=read(HIDDEN,{}),out={};
@@ -89,11 +89,11 @@
     return out;
   }
   function hide(key){const card=read(CARDS,[]).find(c=>cardKey(c)===key);if(card?.searchQuery){const weights=read('newsPhi:topicFeedback:v1',{});weights[card.searchQuery.toLowerCase()]=(Number(weights[card.searchQuery.toLowerCase()])||0)-1;write('newsPhi:topicFeedback:v1',weights)}const map=hiddenMap();map[key]=Date.now();write(HIDDEN,map);write(CARDS,read(CARDS,[]).filter(c=>cardKey(c)!==key));window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{hidden:key}}))}
-  function setMode(mode){write(MODE,INTERVALS[mode]?mode:'off');if(!read(WIPED,0))write(WIPED,Date.now())}
+  function setMode(){/* retired: daily replacement is automatic */}
   function applyPolicy(now=Date.now()){
-    const interval=INTERVALS[read(MODE,'off')],last=Number(read(WIPED,0))||0;
-    if(interval&&last&&now-last>=interval){write(CARDS,[]);write(WIPED,now)}
-    else if(interval&&!last)write(WIPED,now);
+    const last=Number(read(WIPED,0))||0;
+    if(!last){write(WIPED,now);return}
+    if(now-last>=DAY){write(CARDS,[]);write(WIPED,now)}
   }
   function recency(card,now){const t=Date.parse(card.publishedAt)||Date.parse(card.firstSeenAt)||now;return Math.max(0,1-(now-t)/TTL)}
   const baseRank=(card,now)=>Math.round(((card.relevance||0)*50+recency(card,now)*50)*100)/100;
