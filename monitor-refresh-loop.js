@@ -7,7 +7,7 @@
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
   const clean=value=>String(value??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
   const subject=value=>clean(value).replace(/\.(?:jpe?g|png|webp|gif)$/i,'').replace(/\s*\(\d{7,}\)\s*$/,'').slice(0,180);
-  const topicFrom=item=>subject(item?.query||item?.searchQuery||item?.topic||item?.subject||item?.sourceTitle||item?.title||item?.program||'');
+  const topicFrom=item=>subject(item?.query||item?.searchQuery||(Array.isArray(item?.terms)?item.terms:[]).join(' ')||item?.topic||item?.subject||item?.sourceTitle||item?.title||item?.program||'');
   const at=item=>Date.parse(item?.createdAt||item?.created_at||item?.lastAt||item?.updatedAt||item?.collectedAt||item?.publishedAt||'')||Number(item?.lastAt)||0;
   function topics(){
     const rows=[];
