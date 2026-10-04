@@ -707,15 +707,11 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
   const storyContent=document.getElementById('storyContent');
   let state=synchronize();
 
-  function relatedUrl(story){
-    const q=story.similarQuery||story.searchQuery||`${story.headline} background context`;
-    return `https://www-infinity4.github.io/C13b0/phi?${new URLSearchParams({
-      q,run:'1',
-      cardTitle:story.headline||story.title||'',
-      cardBody:[story.standfirst,...(story.paragraphs||[])].join(' ').slice(0,1600),
-      source:story.sources?.[0]?.url||story.url||'',
-      image:story.image||''
-    })}`;
+  function storySearchUrl(story,target){
+    const indexed=[story.headline||story.title||'',story.standfirst||'',...(story.paragraphs||[]),...(story.sources||[]).map(source=>source.title||'')].filter(Boolean).join(' ').replace(/\s+/g,' ').trim().slice(0,6000);
+    const q=indexed||story.similarQuery||story.searchQuery||story.headline||story.title||'';
+    const params=new URLSearchParams({q,run:'1',source:'news-phi',storyTitle:story.headline||story.title||'',storyUrl:story.url||story.sources?.[0]?.url||''});
+    const paths={infinity:'/infinity-phi/',omni:'/omni-phi/',quanta:'/'};return 'https://quantaphi.org'+paths[target]+'?'+params;
   }
 
   function kindLabel(kind){
@@ -748,7 +744,7 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}" aria-label="Dismiss story" title="Show fewer stories like this">×</button></div></div></div></article>`;
+      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a class="story-search infinity" href="${storySearchUrl(story,'infinity')}">Build in Infinity Phi</a><a class="story-search omni" href="${storySearchUrl(story,'omni')}">Explore in Omni Phi</a><a class="story-search quanta" href="${storySearchUrl(story,'quanta')}">Learn in QuantaPhi</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}" aria-label="Dismiss story" title="Show fewer stories like this">×</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
@@ -765,7 +761,7 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     if(!rerender){const readStories=get('newsPhi:readStories:v1',{});readStories[key]=new Date().toISOString();set('newsPhi:readStories:v1',readStories);}
     dialog.dataset.storyKey=key;
     const sources=(story.sources||[]).map(source=>`<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a><span>${esc(source.provider||'Source')}</span></li>`).join('');
-    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
+    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a class="story-search infinity" href="${storySearchUrl(story,'infinity')}">Build in Infinity Phi</a><a class="story-search omni" href="${storySearchUrl(story,'omni')}">Explore in Omni Phi</a><a class="story-search quanta" href="${storySearchUrl(story,'quanta')}">Learn in QuantaPhi</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
     storyContent.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
     if(location.hash!==`#story=${encodeURIComponent(key)}`)history.replaceState(null,'',`#story=${encodeURIComponent(key)}`);
     if(!rerender)dialog.showModal();
@@ -781,11 +777,7 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
   document.getElementById('closeStory').addEventListener('click',closeStory);
   dialog.addEventListener('click',event=>{if(event.target===dialog)closeStory()});
   search?.addEventListener('input',render);
-  const refreshButton=document.getElementById('refreshFeed'),feedMode=document.getElementById('feedMode');
-  if(feedMode)feedMode.value=get('newsPhi:feedMode:v1','off');
-  feedMode?.addEventListener('change',()=>window.NewsPhiDirect?.setMode(feedMode.value));
-  refreshButton?.addEventListener('click',async()=>{refreshButton.disabled=true;refreshButton.textContent='Checking news…';try{await window.NewsPhiDirect?.refresh();state=synchronize();render()}finally{refreshButton.disabled=false;refreshButton.textContent='Refresh news'}});
-
+  // News Phi refreshes automatically; there is no manual reset mode.
 
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
   for(const event of ['newsphi:monitor-feed','newsphi:feed-updated','newsphi:quanta-cloud-ready','phi:ingested'])window.addEventListener(event,()=>{state=synchronize();render()});
