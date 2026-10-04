@@ -177,8 +177,10 @@
     });
 
     const ordered=[...merged.values()].sort((a,b)=>Number(Boolean(b.isNew))-Number(Boolean(a.isNew))||(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||(b.rank||0)-(a.rank||0));
-    const fresh=ordered.filter(c=>c.isNew),older=ordered.filter(c=>!c.isNew),cards=[];
+    const readStories=get('newsPhi:readStories:v1',{});
+    const fresh=ordered.filter(c=>c.isNew),older=ordered.filter(c=>!c.isNew&&!readStories[keyOf(c)]),read=ordered.filter(c=>!c.isNew&&readStories[keyOf(c)]),cards=[];
     while(fresh.length||older.length){cards.push(...fresh.splice(0,3));if(older.length)cards.push(older.shift());}
+    cards.push(...read);
     const legacy={};
     const storyIndex=get(KEYS.stories,{});
     cards.forEach(card=>{
@@ -304,6 +306,8 @@
     if(existing)Object.assign(existing,card);else shared.unshift(card);
     set(KEYS.shared,shared);
     state=synchronize();
+    state.storyIndex[card.storyKey]=makeBaseStory({...card,sourceBacked:true,enriched:true});
+    set(KEYS.stories,state.storyIndex);
     return card.storyKey;
   }
 
@@ -370,6 +374,7 @@
   function openStory(key,rerender=false){
     const story=state.storyIndex[key];
     if(!story)return;
+    if(!rerender){const readStories=get('newsPhi:readStories:v1',{});readStories[key]=new Date().toISOString();set('newsPhi:readStories:v1',readStories);}
     dialog.dataset.storyKey=key;
     const sources=(story.sources||[]).map(source=>`<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a><span>${esc(source.provider||'Source')}</span></li>`).join('');
     storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
@@ -402,4 +407,3 @@
   const hashKey=location.hash.startsWith('#story=')?decodeURIComponent(location.hash.slice(7)):'';
   if(hashKey)openStory(state.storyIndex[hashKey]?hashKey:importedKey);
 })();
-
