@@ -28,7 +28,8 @@
       const key=row.topic.toLowerCase(),prior=newest.get(key);
       if(!prior)newest.set(key,{topic:row.topic,at:row.at,count:1});else{prior.count++;if(row.at>prior.at)prior.at=row.at}
     }
-    const weight=x=>(x.at?Math.max(0,1-(now-x.at)/(30*86400000)):0)*3+Math.min(x.count,5)*0.4;
+    const feedback=read('newsPhi:topicFeedback:v1',{});
+    const weight=x=>Math.max(-2,(Number(feedback[x.topic.toLowerCase()])||0)*0.2)+(x.at?Math.max(0,1-(now-x.at)/(30*86400000)):0)*3+Math.min(x.count,5)*0.4;
     const indexed=[...newest.values()].sort((a,b)=>weight(b)-weight(a)||b.at-a.at).slice(0,60);write(INDEX,indexed);
     return indexed.map(x=>x.topic).slice(0,12);
   }
@@ -46,7 +47,7 @@
     const title=clean(result.title),url=clean(result.url),extract=clean(result.content||result.description||result.snippet);
     if(!title||!/^https?:\/\//i.test(url)||!extract)return null;
     const published=publication(result,now);let domain='';try{domain=new URL(url).hostname.replace(/^www\./,'')}catch{return null}
-    return {id:'direct-news:'+url,storyKey:'news:'+url,title,extract,url,image:clean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),imageVerified:Boolean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),domain,provider:domain,publishedAt:published.at?new Date(published.at).toISOString():'',publishedLabel:published.label,retrievedAt:new Date(now).toISOString(),collectedAt:published.at?new Date(published.at).toISOString():new Date(now).toISOString(),searchQuery:topic,sourceBacked:true,generatedBy:'monitor-news',retrievalVersion:'indexed-fresh-news-v3'};
+    return {id:'direct-news:'+url,storyKey:'news:'+url,title,extract,url,image:clean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),imageVerified:Boolean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),domain,provider:domain,publishedAt:published.at?new Date(published.at).toISOString():'',publishedLabel:published.label,retrievedAt:new Date(now).toISOString(),collectedAt:published.at?new Date(published.at).toISOString():new Date(now).toISOString(),searchQuery:topic,sourceBacked:true,generatedBy:'monitor-news',retrievalVersion:'indexed-fresh-news-v4'};
   }
   const STOP=/^(the|and|for|with|from|into|about|this|that|news|new|how|what|why|who|are|was|vs)$/;
   const terms=value=>[...new Set(clean(value).toLowerCase().replace(/[^a-z0-9' ]+/g,' ').split(/\s+/).filter(w=>w.length>2&&!STOP.test(w)))];
@@ -56,15 +57,15 @@
     return t.reduce((n,w)=>n+(head.includes(w)?2:body.includes(w)?1:0),0)/(t.length*2);
   }
   const isEra=topic=>/\b(1[89]\d\d|20[01]\d|19\d0s|20[01]0s|history|era|vintage|retro|classic|legacy)\b/i.test(topic);
-  async function requestTopic(topic,range){
-    const url=new URL(ENDPOINT);const params={q:topic,format:'json',categories:'news',safesearch:'1',_fresh:String(Date.now())};if(range)params.time_range=range;url.search=new URLSearchParams(params);
+  async function requestTopic(topic,range,page=1){
+    const url=new URL(ENDPOINT);const params={q:topic,format:'json',categories:'news',safesearch:'1',_fresh:String(Date.now()),pageno:String(page)};if(range)params.time_range=range;url.search=new URLSearchParams(params);
     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),18000);
-    try{const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('News search '+response.status);const payload=await response.json();return (payload.results||[]).map(x=>normalize(x,topic)).filter(Boolean).filter(c=>relevance(c,topic)>=0.34).map(c=>{c.relevance=Math.round(relevance(c,topic)*100)/100;return c})}finally{clearTimeout(timer)}
+    try{const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('News search '+response.status);const payload=await response.json();return (payload.results||[]).map(x=>normalize(x,topic)).filter(Boolean).filter(c=>{const at=Date.parse(c.publishedAt);return Number.isFinite(at)&&Date.now()-at<=7*86400000&&at<=Date.now()+300000&&relevance(c,topic)>=0.34}).map(c=>{c.relevance=Math.round(relevance(c,topic)*100)/100;return c})}finally{clearTimeout(timer)}
   }
-  async function searchTopic(topic){
-    if(isEra(topic))return (await requestTopic(topic,'year').catch(()=>requestTopic(topic,''))).slice(0,8);
-    const today=await requestTopic(topic,'day');if(today.length>=3)return today.slice(0,8);
-    const week=await requestTopic(topic,'week').catch(()=>[]);return [...today,...week].slice(0,8);
+  async function searchTopic(topic,page=1){
+    const results=await Promise.allSettled(['day','week'].map(range=>requestTopic(topic,range,page)));
+    if(results.every(x=>x.status==='rejected'))throw Error('Fresh news retrieval unavailable');
+    return results.filter(x=>x.status==='fulfilled').flatMap(x=>x.value);
   }
   async function cloudSubjects(){
     try{const bridge=window.QuantaCloudConnection||window.StarQuestCloudLedger;if(!bridge?.authenticatedFetch)return;
@@ -87,7 +88,7 @@
     for(const [key,time] of Object.entries(map&&typeof map==='object'?map:{}))if(now-Number(time)<30*DAY)out[key]=Number(time);
     return out;
   }
-  function hide(key){const map=hiddenMap();map[key]=Date.now();write(HIDDEN,map);write(CARDS,read(CARDS,[]).filter(c=>cardKey(c)!==key));window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{hidden:key}}))}
+  function hide(key){const card=read(CARDS,[]).find(c=>cardKey(c)===key);if(card?.searchQuery){const weights=read('newsPhi:topicFeedback:v1',{});weights[card.searchQuery.toLowerCase()]=(Number(weights[card.searchQuery.toLowerCase()])||0)-1;write('newsPhi:topicFeedback:v1',weights)}const map=hiddenMap();map[key]=Date.now();write(HIDDEN,map);write(CARDS,read(CARDS,[]).filter(c=>cardKey(c)!==key));window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{hidden:key}}))}
   function setMode(mode){write(MODE,INTERVALS[mode]?mode:'off');if(!read(WIPED,0))write(WIPED,Date.now())}
   function applyPolicy(now=Date.now()){
     const interval=INTERVALS[read(MODE,'off')],last=Number(read(WIPED,0))||0;
@@ -98,7 +99,7 @@
   const baseRank=(card,now)=>Math.round(((card.relevance||0)*50+recency(card,now)*50)*100)/100;
   function stack(stored,found,now=Date.now()){
     const hidden=hiddenMap(now),stack=new Map();
-    for(const card of stored){const key=cardKey(card);if(!key||hidden[key])continue;const age=now-(Date.parse(card.firstSeenAt)||now);if(age>=TTL)continue;stack.set(key,card)}
+    for(const card of stored){const key=cardKey(card);if(!key||hidden[key])continue;stack.set(key,card)}
     const fresh=[];
     for(const card of found.flat()){
       const key=cardKey(card);if(!key||hidden[key])continue;
@@ -109,7 +110,7 @@
     const titles=new Set([...stack.values()].map(c=>String(c.title).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()));
     const accepted=fresh.filter(c=>{const t=String(c.title).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();if(titles.has(t))return false;titles.add(t);return true});
     accepted.forEach(c=>{c.rank=baseRank(c,now)});
-    accepted.sort((a,b)=>b.rank-a.rank);
+    accepted.sort((a,b)=>(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||b.rank-a.rank);
     const added=accepted.slice(0,BATCH);
     added.forEach((c,i)=>{c.rank=Math.round((c.rank+1000-i*0.001)*1000)/1000;c.isNew=true});
     const older=[...stack.values()].map(c=>({...c,isNew:false,rank:baseRank(c,now)})).sort((a,b)=>b.rank-a.rank);
@@ -123,24 +124,25 @@
       await cloudSubjects();const seeds=topics();if(!seeds.length)return {stories:read(CARDS,[]),seeds};
       write(STATUS,{state:'loading',checkedAt:new Date().toISOString(),seeds:seeds.length});
       const stored=read(CARDS,[]),known=new Set(stored.map(cardKey)),hidden=hiddenMap();
-      const results=await Promise.allSettled(seeds.slice(0,8).map(searchTopic));
+      const results=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t))); 
       if(results.every(x=>x.status==='rejected')){write(STATUS,{state:'error',checkedAt:new Date().toISOString()});return {stories:stored,seeds}}
       let found=results.filter(x=>x.status==='fulfilled').map(x=>x.value);
       const unseen=()=>found.flat().filter(c=>!known.has(cardKey(c))&&!hidden[cardKey(c)]).length;
-      for(const range of ['month','year']){
+      for(const page of [2,3]){
         if(unseen()>=BATCH)break;
-        const older=await Promise.allSettled(seeds.slice(0,8).map(t=>requestTopic(t,range)));
+        const older=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t,page)));
         found=found.concat(older.filter(x=>x.status==='fulfilled').map(x=>x.value));
       }
       const {cards,added}=stack(stored,found);
-      write(CARDS,cards);write(STATUS,{state:cards.length?'fresh':'empty',retrievedAt:new Date().toISOString(),count:cards.length,added,seeds:seeds.length});
+      write(CARDS,cards);write(STATUS,{state:added?'fresh':cards.length?'no-new':'empty',retrievedAt:new Date().toISOString(),count:cards.length,added,seeds:seeds.length,windowDays:7});
       window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{stories:cards,seeds,direct:true}}));return {stories:cards,seeds};
     })().finally(()=>running=null);return running;
   }
-  window.NewsPhiDirect={refresh,hide,setMode,applyPolicy,stack,topics,publication,normalize,merge};
+  window.NewsPhiDirect={refresh,hide,setMode,applyPolicy,stack,topics,publication,normalize,merge,requestTopic};
   let timer=0;const schedule=(delay=180)=>{clearTimeout(timer);timer=setTimeout(()=>void refresh().catch(()=>{}),delay)};
   for(const event of ['focus','controlphi:shared','phi:ingested','newsphi:run-retrieval','quantaPhiHistoryAdded','phiShared:collection-change'])window.addEventListener(event,()=>schedule());
   window.addEventListener('storage',event=>{if(SOURCES.includes(event.key||''))schedule()});
   document.addEventListener('starquest:ledger-connected',()=>schedule());
   setInterval(()=>{if(!document.hidden)schedule(0)},300000);schedule(350);
 })();
+

@@ -161,7 +161,7 @@
     const monitor=get('newsPhi:monitorCards:v1',[]).filter(card=>!hiddenStories[card.storyKey||card.url||card.id]);
     const quanta=get('newsPhi:quantaCloudCards:v1',[]);
     const localQuanta=get('quantaPhiCollected',[]).map(card=>({id:'quanta:'+card.key,storyKey:'quanta:'+card.key,title:card.title,extract:card.story,url:card.sourceUrl,image:card.type==='Image'?card.media:'',imageVerified:card.type==='Image',sourceBacked:Boolean(card.sourceUrl),collectedAt:card.collectedAt,domain:'QuantaPhi'}));
-    const all=[...shared,...quanta,...localQuanta,...monitor].filter(card=>card&&card.sourceBacked).filter(isVisibleCard);
+    const all=monitor.filter(card=>card&&card.sourceBacked).filter(isVisibleCard);
     const merged=new Map();
 
     all.forEach(card=>{
@@ -176,7 +176,9 @@
       });
     });
 
-    const cards=[...merged.values()].sort((a,b)=>Number(b.generatedBy==='monitor-news')-Number(a.generatedBy==='monitor-news')||(b.rank||0)-(a.rank||0)||(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||String(b.collectedAt).localeCompare(String(a.collectedAt)));
+    const ordered=[...merged.values()].sort((a,b)=>Number(Boolean(b.isNew))-Number(Boolean(a.isNew))||(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||(b.rank||0)-(a.rank||0));
+    const fresh=ordered.filter(c=>c.isNew),older=ordered.filter(c=>!c.isNew),cards=[];
+    while(fresh.length||older.length){cards.push(...fresh.splice(0,3));if(older.length)cards.push(older.shift());}
     const legacy={};
     const storyIndex=get(KEYS.stories,{});
     cards.forEach(card=>{
@@ -346,14 +348,15 @@
       return `${story?.headline||card.title||''} ${story?.standfirst||card.extract||''} ${story?.similarQuery||card.searchQuery||''}`.toLowerCase().includes(term);
     });
     if(count)count.textContent=`${cards.length} stor${cards.length===1?'y':'ies'}`;
-    syncLabel.textContent=`${state.cards.length} personalized stor${state.cards.length===1?'y':'ies'}`;
+    const status=get('newsPhi:monitorStatus:v1',{});
+    syncLabel.textContent=status.state==='loading'?'Checking current reporting…':status.state==='error'?'News retrieval unavailable · saved feed retained':status.retrievedAt?`${status.added||0} new · checked ${new Date(status.retrievedAt).toLocaleTimeString()}`:`${state.cards.length} sourced stories`;
     if(!cards.length){
-      feed.innerHTML=`<div class="empty-feed"><h2>${state.cards.length?'No stories match that filter':'Your personalized news desk is ready'}</h2><p>${state.cards.length?'Try a broader word.':'Views, searches and shares create subject signals. News Phi turns those signals into readable stories instead of displaying the activity log itself.'}</p>${state.cards.length?'':`<a href="https://www-infinity4.github.io/Omni-Phi/">Open Omni Phi</a>`}</div>`;
+      feed.innerHTML=`<div class="empty-feed"><h2>${state.cards.length?'No stories match that filter':'Your personalized news desk is ready'}</h2><p>${state.cards.length?'Try a broader word.':'Searches and collections choose your topics. Refresh retrieves dated reporting from the last seven days. If there is no new reporting, your saved feed remains available.'}</p>${state.cards.length?'':`<a href="https://www-infinity4.github.io/Omni-Phi/">Open Omni Phi</a>`}</div>`;
       return;
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}">Hide story</button></div></div></div></article>`;
+      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a href="${relatedUrl(story)}">Read similar news</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}" aria-label="Dismiss story" title="Show fewer stories like this">×</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
@@ -385,6 +388,11 @@
   document.getElementById('closeStory').addEventListener('click',closeStory);
   dialog.addEventListener('click',event=>{if(event.target===dialog)closeStory()});
   search?.addEventListener('input',render);
+  const refreshButton=document.getElementById('refreshFeed'),feedMode=document.getElementById('feedMode');
+  if(feedMode)feedMode.value=get('newsPhi:feedMode:v1','off');
+  feedMode?.addEventListener('change',()=>window.NewsPhiDirect?.setMode(feedMode.value));
+  refreshButton?.addEventListener('click',async()=>{refreshButton.disabled=true;refreshButton.textContent='Checking news…';try{await window.NewsPhiDirect?.refresh();state=synchronize();render()}finally{refreshButton.disabled=false;refreshButton.textContent='Refresh news'}});
+
 
   window.addEventListener('controlphi:shared',()=>{state=synchronize();render()});
   for(const event of ['newsphi:monitor-feed','newsphi:feed-updated','newsphi:quanta-cloud-ready','phi:ingested'])window.addEventListener(event,()=>{state=synchronize();render()});
@@ -394,3 +402,4 @@
   const hashKey=location.hash.startsWith('#story=')?decodeURIComponent(location.hash.slice(7)):'';
   if(hashKey)openStory(state.storyIndex[hashKey]?hashKey:importedKey);
 })();
+

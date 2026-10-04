@@ -43,7 +43,7 @@
   }
 
   function cardRecord(key){
-    return get(SHARED_KEY,[]).find(card=>keyOf(card)===key)||null;
+    return [...get('newsPhi:monitorCards:v1',[]),...get(SHARED_KEY,[])].find(card=>keyOf(card)===key)||null;
   }
 
   function storyRecord(key){
@@ -119,12 +119,10 @@
 
     try{
       const shared=get(SHARED_KEY,[]),existing=new Set(shared.flatMap(card=>[card.url,keyOf(card)].filter(Boolean)));
-      const results=await Promise.allSettled([wikipedia(query,offset),duckDuckGo(query),crossref(query,round*10),searxng(query,round)]);
-      let found=rank(query,results.flatMap(result=>result.status==='fulfilled'?result.value:[]),existing);
-      if(!found.length){
-        const fallback=[...new Set(words(query))].slice(0,5).join(' ');
-        found=rank(fallback,await wikipedia(fallback,offset+8),existing);
-      }
+      const parentStory=storyRecord(key)||{},topic=parentStory.searchQuery||query;
+      const results=await Promise.allSettled(['day','week'].map(range=>window.NewsPhiDirect.requestTopic(topic,range,round+1)));
+      const known=new Set([...get('newsPhi:monitorCards:v1',[]),...shared].map(c=>c.url));
+      let found=results.filter(x=>x.status==='fulfilled').flatMap(x=>x.value).filter(c=>!known.has(c.url)).map(c=>({...c,excerpt:c.extract}));
       found=found.slice(0,6);
       if(!found.length){
         toast('No new related sources were found in this pass.');
@@ -150,13 +148,15 @@
           image:source.image||'',
           imageVerified:Boolean(source.image),
           sourceBacked:true,
-          generatedBy:'news-phi-similar-build',
+          generatedBy:'monitor-news',
           parentStoryKey:key,
           relation:'similar'
         };
       });
 
-      set(SHARED_KEY,[...shared,...built]);
+      const stored=get('newsPhi:monitorCards:v1',[]);
+      const stacked=window.NewsPhiDirect.stack(stored,[built]);
+      set('newsPhi:monitorCards:v1',stacked.cards);
       rounds[key]=round+1;set(ROUND_KEY,rounds);
       toast(`Built ${built.length} new related card${built.length===1?'':'s'} below this story.`);
       window.dispatchEvent(new CustomEvent('controlphi:shared',{detail:{source:'build-similar-news',parentStoryKey:key,count:built.length}}));

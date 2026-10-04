@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
   <style>html{scroll-behavior:auto!important}</style>
-</head>
+<style>.news-card{position:relative}.hide-story{position:absolute;right:8px;top:8px;min-width:36px;min-height:36px;font-size:20px;z-index:2}.card-meta{padding-right:28px}</style></head>
 <body>
   <header class="topbar">
     <a class="brand" href="./" aria-label="News Phi home"><strong>NEWS</strong><span>φ</span></a>
@@ -29,7 +29,7 @@
       <p class="intro">News Phi grows from what you actually explore. Tapping a program records a view signal, searches add subjects you want to investigate, tracked links record what you actually followed, and completed shares count as the strongest signal. News Phi turns those choices into reusable story cards and brings repeated interests back toward the top, giving you an educational feed shaped by your own viewing and research instead of a generic list.</p>
     </section>
 
-<div class="feed-controls"><button type="button" id="refreshFeed">Refresh news</button><label>Start fresh <select id="feedMode"><option value="off">Never wipe (stories expire after 7 days)</option><option value="daily">Fresh news once a day</option><option value="weekly">Fresh news once a week</option></select></label></div>
+<div class="feed-controls"><button type="button" id="refreshFeed">Refresh news</button><label>Reset saved feed <select id="feedMode"><option value="off">Keep saved stories</option><option value="daily">Reset daily</option><option value="weekly">Reset weekly</option></select></label></div>
 <section class="feed" id="feed" aria-live="polite">
       <div class="loading-card">Synchronizing collected cards…</div>
     </section>
@@ -50,15 +50,15 @@
   <script src="interest-feed-bridge.js?v=20260929-live-signals1"></script>
   <script src="background-enrichment-gate.js?v=20261002-stable1"></script>
   <script src="source-truth-gate.js?v=20261002-truth1"></script>
-  <script src="app.js?v=20261003-indexed-news4"></script>
+  <script src="app.js?v=20261004-fresh5"></script>
   <script src="scroll-stability.js?v=20260914-anchor1"></script>
   <script src="https://www-infinity4.github.io/QuantaPhi/cloud-wallet-client.js?v=20261003-device-recovery3"></script>
   <script src="quanta-cloud-bridge.js?v=20261003-device1"></script>
-  <script src="monitor-refresh-loop.js?v=20261003-indexed-news3"></script>
+  <script src="monitor-refresh-loop.js?v=20261004-fresh5"></script>
   <script src="news-card-image-resolver.js?v=20261002-images1"></script>
   <script src="news-image-integrity.js?v=20261002-images1"></script>
   <script src="user-index-bridge.js?v=20261002-index1"></script>
   <script src="feed-controls.js?v=20261003-revolve1"></script>
-  <script src="news-interactions.js?v=20261002-fresh1"></script>
+  <script src="news-interactions.js?v=20261004-fresh5"></script>
 </body>
 </html>
