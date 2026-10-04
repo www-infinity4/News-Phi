@@ -116,7 +116,7 @@
       id:'monitor-news-'+index+'-'+Date.now(),
       storyKey:'monitor:'+clean(story.url),
       title:clean(story.title),
-      extract:clean(story.excerpt),
+      extract:clean(story.excerpt)||clean(story.title),
       url:clean(story.url),
       image:clean(story.image),
       imageVerified:Boolean(story.image),
@@ -128,7 +128,7 @@
       sourceBacked:true,
       generatedBy:'monitor-news',
       quantWhy:story.why||null
-    })).filter(card=>card.title&&card.url&&card.extract);
+    })).filter(card=>card.title&&card.url);
     // Empty successful retrievals must clear old headlines, not masquerade as fresh news.
     write(MONITOR_CARDS,stories);
     write(MONITOR_STATUS,{state:stories.length?'fresh':'empty',retrievedAt:clean(payload?.generatedAt)||new Date().toISOString(),count:stories.length,source:'Monitor / SearXNG',seeds:(payload?.seeds||[]).length});
