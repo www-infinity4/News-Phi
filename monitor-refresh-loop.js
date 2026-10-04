@@ -7,8 +7,19 @@
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
   const clean=value=>String(value??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
   const subject=value=>clean(value).replace(/\.(?:jpe?g|png|webp|gif)$/i,'').replace(/\s*\(\d{7,}\)\s*$/,'').slice(0,180);
-  const topicFrom=item=>subject(item?.query||item?.searchQuery||item?.topic||item?.subject||item?.sourceTitle||item?.title||item?.program||'');
+  const topicFrom=item=>subject(item?.query||item?.searchQuery||(Array.isArray(item?.terms)?item.terms:[]).join(' ')||item?.topic||item?.subject||item?.sourceTitle||item?.title||item?.program||'');
   const at=item=>Date.parse(item?.createdAt||item?.created_at||item?.lastAt||item?.updatedAt||item?.collectedAt||item?.publishedAt||'')||Number(item?.lastAt)||0;
+  function canonicalUrl(value){
+    try{const u=new URL(clean(value));if(!['http:','https:'].includes(u.protocol))return '';u.hash='';u.hostname=u.hostname.replace(/^www\./,'');
+      for(const key of [...u.searchParams.keys()])if(/^utm_/i.test(key)||/^(fbclid|gclid|dclid|msclkid|mc_cid|mc_eid)$/i.test(key))u.searchParams.delete(key);
+      u.searchParams.sort();if(u.pathname!=='/')u.pathname=u.pathname.replace(/\/+$/,'');return u.href;
+    }catch{return ''}
+  }
+  function excludedSources(){
+    const excluded=new Set();
+    for(const key of SOURCES){const rows=read(key,[]);if(!Array.isArray(rows))continue;for(const row of rows){if(row?.generatedBy==='monitor-news')continue;for(const value of [row?.url,row?.sourceUrl,...(Array.isArray(row?.excludeUrls)?row.excludeUrls:[])]){const url=canonicalUrl(value);if(url)excluded.add(url)}}}
+    return excluded;
+  }
   function topics(){
     const rows=[];
     for(const key of SOURCES){
@@ -47,7 +58,8 @@
     const title=clean(result.title),url=clean(result.url),extract=clean(result.content||result.description||result.snippet);
     if(!title||!/^https?:\/\//i.test(url)||!extract)return null;
     const published=publication(result,now);let domain='';try{domain=new URL(url).hostname.replace(/^www\./,'')}catch{return null}
-    return {id:'direct-news:'+url,storyKey:'news:'+url,title,extract,url,image:clean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),imageVerified:Boolean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),domain,provider:domain,publishedAt:new Date(published.at||now).toISOString(),publishedLabel:published.label||'Publication time unavailable',publicationVerified:Boolean(published.at),retrievedAt:new Date(now).toISOString(),collectedAt:published.at?new Date(published.at).toISOString():new Date(now).toISOString(),searchQuery:topic,sourceBacked:true,generatedBy:'monitor-news',retrievalVersion:'indexed-fresh-news-v4'};
+    const canonical=canonicalUrl(url);if(!canonical)return null;
+    return {id:'direct-news:'+canonical,storyKey:'news:'+canonical,title,extract,url:canonical,image:clean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),imageVerified:Boolean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),domain,provider:domain,publishedAt:published.at?new Date(published.at).toISOString():'',publishedLabel:published.label,publicationVerified:Boolean(published.at),retrievedAt:new Date(now).toISOString(),collectedAt:published.at?new Date(published.at).toISOString():new Date(now).toISOString(),searchQuery:topic,sourceBacked:true,generatedBy:'monitor-news',retrievalVersion:'indexed-fresh-news-v5'};
   }
   const STOP=/^(the|and|for|with|from|into|about|this|that|news|new|how|what|why|who|are|was|vs)$/;
   const terms=value=>[...new Set(clean(value).toLowerCase().replace(/[^a-z0-9' ]+/g,' ').split(/\s+/).filter(w=>w.length>2&&!STOP.test(w)))];
@@ -60,7 +72,7 @@
   async function requestTopic(topic,range,page=1){
     const url=new URL(ENDPOINT);const params={q:topic,format:'json',categories:'news',safesearch:'1',_fresh:String(Date.now()),pageno:String(page)};if(range)params.time_range=range;url.search=new URLSearchParams(params);
     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),18000);
-    try{const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('News search '+response.status);const payload=await response.json();return (payload.results||[]).map(x=>normalize(x,topic)).filter(Boolean).filter(c=>{const at=Date.parse(c.publishedAt);return Number.isFinite(at)&&at<=Date.now()+300000&&(!c.publicationVerified||Date.now()-at<=7*86400000)&&relevance(c,topic)>=0.34}).map(c=>{c.relevance=Math.round(relevance(c,topic)*100)/100;return c})}finally{clearTimeout(timer)}
+    try{const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('News search '+response.status);const payload=await response.json(),excluded=excludedSources();return (payload.results||[]).map(x=>normalize(x,topic)).filter(Boolean).filter(c=>{const at=Date.parse(c.publishedAt);return c.publicationVerified&&Number.isFinite(at)&&at<=Date.now()+300000&&Date.now()-at<=7*86400000&&!excluded.has(c.url)&&relevance(c,topic)>=0.34}).map(c=>{c.relevance=Math.round(relevance(c,topic)*100)/100;return c})}finally{clearTimeout(timer)}
   }
   async function searchTopic(topic,page=1){
     const results=await Promise.allSettled(['day','week'].map(range=>requestTopic(topic,range,page)));
@@ -82,27 +94,27 @@
   }
   const HIDDEN='newsPhi:hiddenStories:v1',WIPED='newsPhi:feedWipedAt:v1';
   const DAY=86400000,TTL=7*DAY,BATCH=20,MAX_FEED=200;
-  const cardKey=card=>card?.storyKey||card?.url||card?.id||'';
+  const cardKey=card=>canonicalUrl(card?.url)?'news:'+canonicalUrl(card.url):card?.storyKey||card?.id||'';
   function hiddenMap(now=Date.now()){
     const map=read(HIDDEN,{}),out={};
     for(const [key,time] of Object.entries(map&&typeof map==='object'?map:{}))if(now-Number(time)<30*DAY)out[key]=Number(time);
     return out;
   }
-  function hide(key){const card=read(CARDS,[]).find(c=>cardKey(c)===key);if(card?.searchQuery){const weights=read('newsPhi:topicFeedback:v1',{});weights[card.searchQuery.toLowerCase()]=(Number(weights[card.searchQuery.toLowerCase()])||0)-1;write('newsPhi:topicFeedback:v1',weights)}const map=hiddenMap();map[key]=Date.now();write(HIDDEN,map);write(CARDS,read(CARDS,[]).filter(c=>cardKey(c)!==key));window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{hidden:key}}))}
+  function hide(key){const match=c=>[cardKey(c),c.storyKey,c.url,c.id].includes(key),card=read(CARDS,[]).find(match);if(card?.searchQuery){const weights=read('newsPhi:topicFeedback:v1',{});weights[card.searchQuery.toLowerCase()]=(Number(weights[card.searchQuery.toLowerCase()])||0)-1;write('newsPhi:topicFeedback:v1',weights)}const map=hiddenMap();map[key]=Date.now();if(card)map[cardKey(card)]=Date.now();write(HIDDEN,map);write(CARDS,read(CARDS,[]).filter(c=>!match(c)));window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{hidden:key}}))}
   function setMode(){/* retired: daily replacement is automatic */}
   function applyPolicy(now=Date.now()){
     const last=Number(read(WIPED,0))||0;
-    if(!last){write(WIPED,now);return}
-    if(now-last>=DAY){write(CARDS,[]);write(WIPED,now)}
+    if(!last)write(WIPED,now);
+    // A source failure must never erase the last successful feed.
   }
   function recency(card,now){const t=Date.parse(card.publishedAt)||Date.parse(card.firstSeenAt)||now;return Math.max(0,1-(now-t)/TTL)}
   const baseRank=(card,now)=>Math.round(((card.relevance||0)*50+recency(card,now)*50)*100)/100;
   function stack(stored,found,now=Date.now()){
-    const hidden=hiddenMap(now),stack=new Map();
-    for(const card of stored){const key=cardKey(card);if(!key||hidden[key])continue;stack.set(key,card)}
+    const hidden=hiddenMap(now),excluded=excludedSources(),stack=new Map();
+    for(const card of stored){const key=cardKey(card);if(!key||hidden[key]||hidden[card.storyKey]||excluded.has(canonicalUrl(card.url)))continue;stack.set(key,card)}
     const fresh=[];
     for(const card of found.flat()){
-      const key=cardKey(card);if(!key||hidden[key])continue;
+      const key=cardKey(card);if(!key||hidden[key]||hidden[card.storyKey]||excluded.has(canonicalUrl(card.url)))continue;
       const prior=stack.get(key);
       if(prior){stack.set(key,{...prior,relevance:Math.max(prior.relevance||0,card.relevance||0),retrievedAt:card.retrievedAt,revisitedAt:card.retrievedAt});continue}
       if(!fresh.some(c=>cardKey(c)===key))fresh.push({...card,firstSeenAt:new Date(now).toISOString()});
@@ -127,7 +139,7 @@
       const results=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t))); 
       if(results.every(x=>x.status==='rejected')){write(STATUS,{state:'error',checkedAt:new Date().toISOString(),message:'Direct news search unavailable; trying Monitor fallback'});if(window.NewsPhiMonitor?.refresh)await window.NewsPhiMonitor.refresh();else window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));return {stories:read(CARDS,stored),seeds}}
       let found=results.filter(x=>x.status==='fulfilled').map(x=>x.value);
-      const unseen=()=>found.flat().filter(c=>!known.has(cardKey(c))&&!hidden[cardKey(c)]).length;
+      const unseen=()=>stack(stored,found).added;
       for(const page of [2,3]){
         if(unseen()>=BATCH)break;
         const older=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t,page)));
@@ -139,11 +151,10 @@
       window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{stories:cards,seeds,direct:true}}));return {stories:cards,seeds};
     })().finally(()=>running=null);return running;
   }
-  window.NewsPhiDirect={refresh,hide,setMode,applyPolicy,stack,topics,publication,normalize,merge,requestTopic};
+  window.NewsPhiDirect={refresh,hide,setMode,applyPolicy,stack,topics,publication,normalize,merge,requestTopic,canonicalUrl,cardKey};
   let timer=0;const schedule=(delay=180)=>{clearTimeout(timer);timer=setTimeout(()=>void refresh().catch(()=>{}),delay)};
   for(const event of ['focus','controlphi:shared','phi:ingested','newsphi:run-retrieval','quantaPhiHistoryAdded','phiShared:collection-change'])window.addEventListener(event,()=>schedule());
   window.addEventListener('storage',event=>{if(SOURCES.includes(event.key||''))schedule()});
   document.addEventListener('starquest:ledger-connected',()=>schedule());
   setInterval(()=>{if(!document.hidden)schedule(0)},300000);schedule(350);
 })();
-

@@ -129,10 +129,12 @@
       generatedBy:'monitor-news',
       quantWhy:story.why||null
     })).filter(card=>card.title&&card.url);
-    // Empty successful retrievals must clear old headlines, not masquerade as fresh news.
-    write(MONITOR_CARDS,stories);
-    write(MONITOR_STATUS,{state:stories.length?'fresh':'empty',retrievedAt:clean(payload?.generatedAt)||new Date().toISOString(),count:stories.length,source:'Monitor / SearXNG',seeds:(payload?.seeds||[]).length});
-    return stories;
+    const now=Date.now(),direct=window.NewsPhiDirect;
+    const dated=stories.map(card=>direct?.normalize?{...direct.normalize({title:card.title,url:card.url,content:card.extract,publishedDate:card.publishedAt,image:card.image},card.searchQuery,now),quantWhy:card.quantWhy}:card).filter(card=>card?.title&&card.publishedAt&&Date.parse(card.publishedAt)<=now+300000&&now-Date.parse(card.publishedAt)<=7*86400000);
+    const stored=read(MONITOR_CARDS,[]),result=direct?.stack?direct.stack(stored,[dated],now):{cards:dated.length?dated:stored,added:dated.length};
+    write(MONITOR_CARDS,result.cards);
+    write(MONITOR_STATUS,{state:result.added?'fresh':result.cards.length?'no-new':'empty',retrievedAt:clean(payload?.generatedAt)||new Date().toISOString(),count:result.cards.length,added:result.added,source:'Monitor / SearXNG',seeds:(payload?.seeds||[]).length});
+    return result.cards;
   }
 
   async function refreshFromMonitor(){
@@ -142,7 +144,7 @@
     // Always call Monitor. When browser-local subjects are empty, the Worker falls back to its persisted D1 Quant graph.
     try{
       const response=await fetch(endpoint.replace(/\/$/,'')+'/p/news/feed',{
-        method:'POST',cache:'no-store',headers:{'content-type':'application/json','cache-control':'no-cache'},
+        method:'POST',cache:'no-store',headers:{'content-type':'application/json'},
         body:JSON.stringify({seeds,depth:2})
       });
       if(!response.ok)throw new Error('Monitor HTTP '+response.status);
@@ -160,4 +162,3 @@
   window.NewsPhiMonitor={chosenTopics,refresh:refreshFromMonitor,endpointKey:ENDPOINT_KEY,cardsKey:MONITOR_CARDS};
   window.addEventListener('newsphi:refresh-monitor',()=>void refreshFromMonitor().catch(()=>{}));
 })();
-

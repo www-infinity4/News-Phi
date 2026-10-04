@@ -265,7 +265,7 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     const jobs=read(QUEUE_KEY,[]),byKey=new Map(jobs.map(job=>[job.jobKey,job]));
     read(SIGNAL_KEY,[]).filter(Boolean).forEach(signal=>{
       const signalKind=clean(signal.kind)||'view';
-      if(!['search','share','collect','view'].includes(signalKind))return;
+      if(!['search','share','store','collect','view'].includes(signalKind))return;
       const subject=signalKind==='search'?clean(signal.query):clean(signal.program||signal.title||signal.topic||signal.query||signal.channel);
       if(!subject)return;
       const kind=signalKind,jobKey=`${kind}:${slug(signal.topicKey||subject)}`;
