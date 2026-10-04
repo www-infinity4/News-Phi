@@ -47,7 +47,7 @@
     const title=clean(result.title),url=clean(result.url),extract=clean(result.content||result.description||result.snippet);
     if(!title||!/^https?:\/\//i.test(url)||!extract)return null;
     const published=publication(result,now);let domain='';try{domain=new URL(url).hostname.replace(/^www\./,'')}catch{return null}
-    return {id:'direct-news:'+url,storyKey:'news:'+url,title,extract,url,image:clean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),imageVerified:Boolean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),domain,provider:domain,publishedAt:published.at?new Date(published.at).toISOString():'',publishedLabel:published.label,retrievedAt:new Date(now).toISOString(),collectedAt:published.at?new Date(published.at).toISOString():new Date(now).toISOString(),searchQuery:topic,sourceBacked:true,generatedBy:'monitor-news',retrievalVersion:'indexed-fresh-news-v4'};
+    return {id:'direct-news:'+url,storyKey:'news:'+url,title,extract,url,image:clean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),imageVerified:Boolean(result.img_src||result.thumbnail_src||result.thumbnail||result.image),domain,provider:domain,publishedAt:new Date(published.at||now).toISOString(),publishedLabel:published.label||'Publication time unavailable',publicationVerified:Boolean(published.at),retrievedAt:new Date(now).toISOString(),collectedAt:published.at?new Date(published.at).toISOString():new Date(now).toISOString(),searchQuery:topic,sourceBacked:true,generatedBy:'monitor-news',retrievalVersion:'indexed-fresh-news-v4'};
   }
   const STOP=/^(the|and|for|with|from|into|about|this|that|news|new|how|what|why|who|are|was|vs)$/;
   const terms=value=>[...new Set(clean(value).toLowerCase().replace(/[^a-z0-9' ]+/g,' ').split(/\s+/).filter(w=>w.length>2&&!STOP.test(w)))];
@@ -60,7 +60,7 @@
   async function requestTopic(topic,range,page=1){
     const url=new URL(ENDPOINT);const params={q:topic,format:'json',categories:'news',safesearch:'1',_fresh:String(Date.now()),pageno:String(page)};if(range)params.time_range=range;url.search=new URLSearchParams(params);
     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),18000);
-    try{const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('News search '+response.status);const payload=await response.json();return (payload.results||[]).map(x=>normalize(x,topic)).filter(Boolean).filter(c=>{const at=Date.parse(c.publishedAt);return Number.isFinite(at)&&Date.now()-at<=7*86400000&&at<=Date.now()+300000&&relevance(c,topic)>=0.34}).map(c=>{c.relevance=Math.round(relevance(c,topic)*100)/100;return c})}finally{clearTimeout(timer)}
+    try{const response=await fetch(url,{cache:'no-store',signal:ctl.signal});if(!response.ok)throw Error('News search '+response.status);const payload=await response.json();return (payload.results||[]).map(x=>normalize(x,topic)).filter(Boolean).filter(c=>{const at=Date.parse(c.publishedAt);return Number.isFinite(at)&&at<=Date.now()+300000&&(!c.publicationVerified||Date.now()-at<=7*86400000)&&relevance(c,topic)>=0.34}).map(c=>{c.relevance=Math.round(relevance(c,topic)*100)/100;return c})}finally{clearTimeout(timer)}
   }
   async function searchTopic(topic,page=1){
     const results=await Promise.allSettled(['day','week'].map(range=>requestTopic(topic,range,page)));
@@ -121,7 +121,7 @@
     if(running)return running;
     running=(async()=>{
       applyPolicy();
-      await cloudSubjects();const seeds=topics();if(!seeds.length)return {stories:read(CARDS,[]),seeds};
+      await cloudSubjects();const seeds=topics();if(!seeds.length){window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));return {stories:read(CARDS,[]),seeds};}
       write(STATUS,{state:'loading',checkedAt:new Date().toISOString(),seeds:seeds.length});
       const stored=read(CARDS,[]),known=new Set(stored.map(cardKey)),hidden=hiddenMap();
       const results=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t))); 
