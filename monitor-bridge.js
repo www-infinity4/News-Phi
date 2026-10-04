@@ -77,6 +77,5 @@
   }
 
   window.NewsPhiMonitor={chosenTopics,refresh:refreshFromMonitor,endpointKey:ENDPOINT_KEY,cardsKey:MONITOR_CARDS};
-  window.addEventListener('newsphi:refresh-monitor',()=>void refreshFromMonitor());
-  setTimeout(()=>void refreshFromMonitor().catch(()=>{}),300);
+  window.addEventListener('newsphi:refresh-monitor',()=>void refreshFromMonitor().catch(()=>{}));
 })();
