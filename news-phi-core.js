@@ -668,14 +668,6 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
       sharedDomain:story.domain||'',
       sharedQuery:story.similarQuery||story.searchQuery||''
     });
-    const params=new URLSearchParams({
-      sharedTitle:story.headline||story.title,
-      sharedBody:[story.standfirst,...(story.paragraphs||[])].join(' ').slice(0,1800),
-      sharedUrl:story.url||'',
-      sharedImage:story.image||'',
-      sharedDomain:story.domain||'',
-      sharedQuery:story.similarQuery||story.searchQuery||''
-    });
     const shareUrl=`${location.origin}/news-phi/?${params}#story=${encodeURIComponent(key)}`;
     if(!navigator.share){
       try{await navigator.clipboard.writeText(shareUrl);alert('Story link copied.')}catch{}
