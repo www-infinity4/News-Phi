@@ -26,8 +26,8 @@
       const items=read(key,[]);if(!Array.isArray(items))continue;
       for(const item of items){
         if(!item||item.generatedBy==='monitor-news'||item.generatedBy==='news-phi-semantic-index'||(item.retrievalVersion&&!item.seedOnly))continue;
-        const topic=topicFrom(item);if(topic)rows.push({topic,at:at(item)});
-        for(const anchor of (item.semanticAnchors||[]).filter(x=>x.kind==='phrase').slice(0,2)){const term=subject(anchor.term);if(term)rows.push({topic:term,at:at(item)-1})}
+        const topic=topicFrom(item);if(topic)rows.push({topic,at:at(item),hits:Math.max(1,Number(item?.hits||item?.signalCount)||1)});
+        for(const anchor of (item.semanticAnchors||[]).filter(x=>x.kind==='phrase').slice(0,2)){const term=subject(anchor.term);if(term)rows.push({topic:term,at:at(item)-1,hits:1})}
       }
     }
     const semantic=read('newsPhi:semanticSeedIndex:v1',{});
@@ -37,12 +37,18 @@
     for(const row of rows){
       if(row.topic.length<3||!/[a-z]/i.test(row.topic))continue;
       const key=row.topic.toLowerCase(),prior=newest.get(key);
-      if(!prior)newest.set(key,{topic:row.topic,at:row.at,count:1});else{prior.count++;if(row.at>prior.at)prior.at=row.at}
+      const hits=Math.max(1,Number(row.hits)||1);
+      if(!prior)newest.set(key,{topic:row.topic,at:row.at,count:hits});else{prior.count+=hits;if(row.at>prior.at)prior.at=row.at}
     }
     const feedback=read('newsPhi:topicFeedback:v1',{});
-    const weight=x=>Math.max(-2,(Number(feedback[x.topic.toLowerCase()])||0)*0.2)+(x.at?Math.max(0,1-(now-x.at)/(30*86400000)):0)*3+Math.min(x.count,5)*0.4;
-    const indexed=[...newest.values()].sort((a,b)=>weight(b)-weight(a)||b.at-a.at).slice(0,60);write(INDEX,indexed);
-    return indexed.map(x=>x.topic).slice(0,12);
+    const weight=x=>{
+      const preference=(Number(feedback[x.topic.toLowerCase()])||0)*2.2;
+      const recent=x.at?Math.max(0,1-(now-x.at)/(90*86400000))*3:0;
+      const repeated=Math.min(9,Math.log2(1+Math.max(1,x.count))*1.7);
+      return preference+recent+repeated;
+    };
+    const indexed=[...newest.values()].map(x=>({...x,weight:Math.round(weight(x)*100)/100})).sort((a,b)=>b.weight-a.weight||b.at-a.at).slice(0,120);write(INDEX,indexed);
+    return indexed.map(x=>x.topic).slice(0,18);
   }
   function publication(result,now=Date.now()){
     const explicit=result.publishedDate||result.published_at||result.pubDate||result.date;
@@ -81,8 +87,10 @@
   }
   async function cloudSubjects(){
     try{const bridge=window.QuantaCloudConnection||window.StarQuestCloudLedger;if(!bridge?.authenticatedFetch)return;
-      const response=await bridge.authenticatedFetch('https://quanta-phi-ledger.marvaseater.workers.dev/v1/quants/history');if(!response.ok)return;
-      const data=await response.json();write('newsPhi:cloudSubjects:v1',(data.searches||[]).map(x=>({query:x.query_text,created_at:new Date(x.created_at).toISOString()})));
+      const response=await bridge.authenticatedFetch('https://quanta-phi-ledger.marvaseater.workers.dev/v1/quants/interests');if(!response.ok)return;
+      const data=await response.json();
+      write('newsPhi:cloudSubjects:v1',(data.topics||[]).map(x=>({query:x.query,hits:Number(x.hits)||1,lastAt:Number(x.last_at)||0,firstAt:Number(x.first_at)||0,created_at:new Date(Number(x.last_at)||Date.now()).toISOString()})));
+      write('newsPhi:cloudInterestMeta:v1',{totalSearches:Number(data.total_searches)||0,uniqueQueries:Number(data.unique_queries)||0,updatedAt:new Date().toISOString()});
     }catch(_){}
   }
   function merge(batches){
@@ -136,13 +144,13 @@
       await cloudSubjects();const seeds=topics();if(!seeds.length){if(window.NewsPhiMonitor?.refresh)await window.NewsPhiMonitor.refresh();else window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));return {stories:read(CARDS,[]),seeds};}
       write(STATUS,{state:'loading',checkedAt:new Date().toISOString(),seeds:seeds.length});
       const stored=read(CARDS,[]),known=new Set(stored.map(cardKey)),hidden=hiddenMap();
-      const results=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t))); 
+      const results=await Promise.allSettled(seeds.slice(0,12).map(t=>searchTopic(t))); 
       if(results.every(x=>x.status==='rejected')){write(STATUS,{state:'error',checkedAt:new Date().toISOString(),message:'Direct news search unavailable; trying Monitor fallback'});if(window.NewsPhiMonitor?.refresh)await window.NewsPhiMonitor.refresh();else window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'));return {stories:read(CARDS,stored),seeds}}
       let found=results.filter(x=>x.status==='fulfilled').map(x=>x.value);
       const unseen=()=>stack(stored,found).added;
       for(const page of [2,3]){
         if(unseen()>=BATCH)break;
-        const older=await Promise.allSettled(seeds.slice(0,8).map(t=>searchTopic(t,page)));
+        const older=await Promise.allSettled(seeds.slice(0,12).map(t=>searchTopic(t,page)));
         found=found.concat(older.filter(x=>x.status==='fulfilled').map(x=>x.value));
       }
       if(!found.flat().length){if(window.NewsPhiMonitor?.refresh){await window.NewsPhiMonitor.refresh();return {stories:read(CARDS,stored),seeds}}window.dispatchEvent(new CustomEvent('newsphi:refresh-monitor'))}
