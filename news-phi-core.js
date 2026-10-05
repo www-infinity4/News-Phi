@@ -668,7 +668,9 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
       sharedDomain:story.domain||'',
       sharedQuery:story.similarQuery||story.searchQuery||''
     });
-    const shareUrl=`${location.origin}${location.pathname}?${params}#story=${encodeURIComponent(key)}`;
+    const social=new URL('/news-phi/share',location.origin);
+    social.search=new URLSearchParams({title:story.headline||story.title||'',body:[story.standfirst,...(story.paragraphs||[])].join(' ').slice(0,900),image:story.image||'',url:story.url||'',story:key});
+    const shareUrl=social.href;
     if(!navigator.share){
       try{await navigator.clipboard.writeText(shareUrl);alert('Story link copied.')}catch{}
       return;
@@ -720,11 +722,24 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
   const storyContent=document.getElementById('storyContent');
   let state=synchronize();
 
+  function storyHandoff(story,target){
+    const body=[story.standfirst,...(story.paragraphs||[])].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+    const sources=(story.sources||[]).map(source=>({title:clean(source.title),url:clean(source.url),provider:clean(source.provider),excerpt:clean(source.excerpt||source.extract)})).filter(source=>source.title||source.url);
+    return {version:1,target,source:'news-phi',storyKey:story.storyKey,title:story.headline||story.title||'',body,image:story.image||'',url:story.url||sources[0]?.url||'',domain:story.domain||'',searchQuery:story.searchQuery||'',similarQuery:story.similarQuery||'',sources,createdAt:new Date().toISOString()};
+  }
+  function saveStoryHandoff(story,target){
+    const packet=storyHandoff(story,target);
+    try{localStorage.setItem('phiShared:newsStoryHandoff:v1',JSON.stringify(packet))}catch(_){}
+    try{
+      let shared=get(KEYS.shared,[]);const card={id:'news-handoff:'+packet.storyKey,storyKey:'news-handoff:'+packet.storyKey,title:packet.title,extract:packet.body,url:packet.url,image:packet.image,imageVerified:Boolean(packet.image),sourceBacked:Boolean(packet.url),searchQuery:packet.searchQuery||packet.title,collectedAt:packet.createdAt,domain:packet.domain||'News Phi',sources:packet.sources};
+      shared=[card,...shared.filter(item=>keyOf(item)!==card.storyKey)].slice(0,1000);set(KEYS.shared,shared);
+    }catch(_){}
+    return packet;
+  }
   function storySearchUrl(story,target){
-    const indexed=[story.headline||story.title||'',story.standfirst||'',...(story.paragraphs||[]),...(story.sources||[]).map(source=>source.title||'')].filter(Boolean).join(' ').replace(/\s+/g,' ').trim().slice(0,6000);
-    const q=indexed||story.similarQuery||story.searchQuery||story.headline||story.title||'';
-    const params=new URLSearchParams({q,run:'1',source:'news-phi',storyTitle:story.headline||story.title||'',storyUrl:story.url||story.sources?.[0]?.url||''});
-    const paths={infinity:'/infinity-phi/',omni:'/omni-phi/',quanta:'/'};return 'https://quantaphi.org'+paths[target]+'?'+params;
+    const packet=storyHandoff(story,target),q=packet.title||packet.searchQuery||packet.similarQuery||'';
+    const params=new URLSearchParams({q,run:'1',source:'news-phi',newsStory:packet.storyKey||'',storyTitle:packet.title,storyUrl:packet.url});
+    const paths={infinity:'/infinity-phi/',omni:'/omni-phi/overview/',quanta:'/'};return 'https://quantaphi.org'+paths[target]+'?'+params;
   }
 
   function kindLabel(kind){
@@ -757,10 +772,11 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a class="story-search infinity" href="${storySearchUrl(story,'infinity')}">Build in Infinity Phi</a><a class="story-search omni" href="${storySearchUrl(story,'omni')}">Explore in Omni Phi</a><a class="story-search quanta" href="${storySearchUrl(story,'quanta')}">Learn in QuantaPhi</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}" aria-label="Dismiss story" title="Show fewer stories like this">×</button></div></div></div></article>`;
+      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a class="story-search infinity" data-handoff-target="infinity" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'infinity')}">Build in Infinity Phi</a><a class="story-search omni" data-handoff-target="omni" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'omni')}">Explore in Omni Phi</a><a class="story-search quanta" data-handoff-target="quanta" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'quanta')}">Learn in QuantaPhi</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}" aria-label="Dismiss story" title="Show fewer stories like this">×</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
+    feed.querySelectorAll('[data-handoff-target]').forEach(link=>link.addEventListener('click',()=>{const story=state.storyIndex[link.dataset.storyKey];if(story)saveStoryHandoff(story,link.dataset.handoffTarget)}));
     feed.querySelectorAll('[data-hide]').forEach(button=>button.addEventListener('click',()=>{window.NewsPhiDirect?.hide(button.dataset.hide);state=synchronize();render()}));
     cards.slice(0,6).forEach(card=>{
       const story=state.storyIndex[keyOf(card)];
@@ -774,8 +790,9 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     if(!rerender){const readStories=get('newsPhi:readStories:v1',{}),firstRead=!readStories[key];readStories[key]=new Date().toISOString();set('newsPhi:readStories:v1',readStories);if(firstRead)preferenceSignal(story,1,'read');}
     dialog.dataset.storyKey=key;
     const sources=(story.sources||[]).map(source=>`<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a><span>${esc(source.provider||'Source')}</span></li>`).join('');
-    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a class="story-search infinity" href="${storySearchUrl(story,'infinity')}">Build in Infinity Phi</a><a class="story-search omni" href="${storySearchUrl(story,'omni')}">Explore in Omni Phi</a><a class="story-search quanta" href="${storySearchUrl(story,'quanta')}">Learn in QuantaPhi</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
+    storyContent.innerHTML=`${story.image?`<img class="story-hero" src="${esc(story.image)}" alt="">`:''}<div class="story-full"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="lead">${esc(story.standfirst)}</p>${(story.paragraphs||[]).filter(paragraph=>clean(paragraph)!==clean(story.standfirst)).map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${sources?`<section class="story-sources"><h3>Sources behind this story</h3><ul>${sources}</ul></section>`:''}<div class="card-actions">${story.url?`<a href="${esc(story.url)}" target="_blank" rel="noopener">Open primary source</a>`:''}<a class="story-search infinity" data-handoff-target="infinity" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'infinity')}">Build in Infinity Phi</a><a class="story-search omni" data-handoff-target="omni" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'omni')}">Explore in Omni Phi</a><a class="story-search quanta" data-handoff-target="quanta" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'quanta')}">Learn in QuantaPhi</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button></div></div>`;
     storyContent.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
+    storyContent.querySelectorAll('[data-handoff-target]').forEach(link=>link.addEventListener('click',()=>saveStoryHandoff(story,link.dataset.handoffTarget)));
     if(location.hash!==`#story=${encodeURIComponent(key)}`)history.replaceState(null,'',`#story=${encodeURIComponent(key)}`);
     if(!rerender)dialog.showModal();
     if(!story.enriched&&!story.enriching)void enrichStory(key);
