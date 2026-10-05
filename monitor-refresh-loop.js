@@ -108,7 +108,7 @@
     for(const [key,time] of Object.entries(map&&typeof map==='object'?map:{}))if(now-Number(time)<30*DAY)out[key]=Number(time);
     return out;
   }
-  function hide(key){const match=c=>[cardKey(c),c.storyKey,c.url,c.id].includes(key),card=read(CARDS,[]).find(match);if(card?.searchQuery){const weights=read('newsPhi:topicFeedback:v1',{});weights[card.searchQuery.toLowerCase()]=(Number(weights[card.searchQuery.toLowerCase()])||0)-1;write('newsPhi:topicFeedback:v1',weights)}const map=hiddenMap();map[key]=Date.now();if(card)map[cardKey(card)]=Date.now();write(HIDDEN,map);write(CARDS,read(CARDS,[]).filter(c=>!match(c)));window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{hidden:key}}))}
+  function hide(key){const match=c=>[cardKey(c),c.storyKey,c.url,c.id].includes(key),card=read(CARDS,[]).find(match);if(card?.searchQuery){const weights=read('newsPhi:topicFeedback:v1',{});weights[card.searchQuery.toLowerCase()]=(Number(weights[card.searchQuery.toLowerCase()])||0)-2;write('newsPhi:topicFeedback:v1',weights)}const map=hiddenMap();map[key]=Date.now();if(card)map[cardKey(card)]=Date.now();write(HIDDEN,map);write(CARDS,read(CARDS,[]).filter(c=>!match(c)));window.dispatchEvent(new CustomEvent('newsphi:monitor-feed',{detail:{hidden:key}}))}
   function setMode(){/* retired: daily replacement is automatic */}
   function applyPolicy(now=Date.now()){
     const last=Number(read(WIPED,0))||0;
