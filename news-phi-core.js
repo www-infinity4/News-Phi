@@ -668,15 +668,36 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
       sharedDomain:story.domain||'',
       sharedQuery:story.similarQuery||story.searchQuery||''
     });
-    const social=new URL('/news-phi/share',location.origin);
-    social.search=new URLSearchParams({title:story.headline||story.title||'',body:[story.standfirst,...(story.paragraphs||[])].join(' ').slice(0,900),image:story.image||'',url:story.url||'',story:key});
-    const shareUrl=social.href;
+    const params=new URLSearchParams({
+      sharedTitle:story.headline||story.title,
+      sharedBody:[story.standfirst,...(story.paragraphs||[])].join(' ').slice(0,1800),
+      sharedUrl:story.url||'',
+      sharedImage:story.image||'',
+      sharedDomain:story.domain||'',
+      sharedQuery:story.similarQuery||story.searchQuery||''
+    });
+    const shareUrl=`${location.origin}/news-phi/?${params}#story=${encodeURIComponent(key)}`;
     if(!navigator.share){
       try{await navigator.clipboard.writeText(shareUrl);alert('Story link copied.')}catch{}
       return;
     }
     try{
-      await navigator.share({title:story.headline||story.title,text:excerpt(story),url:shareUrl});
+      let shared=false;
+      if(story.image){
+        try{
+          const response=await fetch(story.image,{mode:'cors'});
+          if(response.ok){
+            const blob=await response.blob();
+            const ext=(blob.type?.split('/')[1]||'jpg').replace('jpeg','jpg');
+            const file=new File([blob],`news-phi-story.${ext}`,{type:blob.type||'image/jpeg'});
+            if(!navigator.canShare||navigator.canShare({files:[file]})){
+              await navigator.share({title:story.headline||story.title,text:excerpt(story),url:shareUrl,files:[file]});
+              shared=true;
+            }
+          }
+        }catch(_){}
+      }
+      if(!shared)await navigator.share({title:story.headline||story.title,text:excerpt(story),url:shareUrl});
       preferenceSignal(story,3,'share');
       const reward=awardStarCoinShare(shareUrl);
       if(reward&&typeof reward.then==='function'){
