@@ -1,0 +1,18 @@
+name: News Phi collected Storybook
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  storybook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node --check news-phi-core.js
+          node --check news-phi-bridges.js
+          node --check storybook.js
+          node --test test/storybook-collections.test.cjs

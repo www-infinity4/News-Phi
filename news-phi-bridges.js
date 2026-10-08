@@ -21,8 +21,8 @@
     const sourceUrl=clean(card?.sourceUrl,2000);
     const type=clean(card?.type,40);
     return {
-      id:'quanta-cloud:'+key,
-      storyKey:'quanta-cloud:'+key,
+      id:'collect:'+key,
+      storyKey:'collect:'+key,
       title,
       extract:story||('Collected in Quanta Phi: '+title),
       body:story,
@@ -42,31 +42,71 @@
     };
   }
 
-  function merge(cards){
-    write(CACHE,cards);
+  function merge(incoming){
+    // Cloud records plus earlier copies; never replace the collection with one page.
+    const prior=read(CACHE,[]);
+    const byStory=new Map();
+    for(const card of [...(Array.isArray(prior)?prior:[]),...incoming]){
+      if(!card?.storyKey)continue;
+      const canonicalKey=String(card.storyKey).replace(/^quanta-cloud:/,'collect:');
+      const candidate={...card,storyKey:canonicalKey,id:canonicalKey};
+      const old=byStory.get(canonicalKey);
+      byStory.set(canonicalKey,old?{...old,...candidate,
+        collectedAt:old.collectedAt||card.collectedAt,
+        extract:candidate.body||candidate.extract||old.body||old.extract}:candidate);
+    }
+    const cards=[...byStory.values()].sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||'')));
+    // The complete cloud ledger remains authoritative; browser copies are a read cache.
+    write(CACHE,cards.slice(0,2000));
     const jobs=read(QUEUE,[]),byKey=new Map((Array.isArray(jobs)?jobs:[]).map(job=>[job.jobKey,job]));
-    cards.forEach(card=>{
+    incoming.forEach(card=>{
       const jobKey='quanta:'+card.storyKey;
       const previous=byKey.get(jobKey)||{};
-      byKey.set(jobKey,{...previous,jobKey,kind:'collect',subject:card.title,query:card.searchQuery||card.title,sourceUrl:card.sourceUrl||'',indexedText:card.body||card.extract||'',collectedAt:card.collectedAt,status:'indexed'});
+      byKey.set(jobKey,{...previous,jobKey,kind:'collect',subject:card.title,
+        query:card.searchQuery||card.title,sourceUrl:card.sourceUrl||'',
+        indexedText:card.body||card.extract||'',collectedAt:card.collectedAt,status:'indexed'});
     });
-    const queued=[...byKey.values()].sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||''))).slice(0,500);
-    write(QUEUE,queued);
-    window.dispatchEvent(new CustomEvent('phi:ingested',{detail:{source:'quanta-cloud',count:cards.length}}));
-    window.dispatchEvent(new CustomEvent('newsphi:quanta-cloud-ready',{detail:{count:cards.length,jobs:queued.length}}));
+    write(QUEUE,[...byKey.values()].sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||''))).slice(0,1000));
+    window.dispatchEvent(new CustomEvent('newsphi:quanta-cloud-ready',
+      {detail:{count:cards.length,received:incoming.length}}));
     window.dispatchEvent(new Event('newsphi:run-retrieval'));
-    return queued;
+    window.dispatchEvent(new CustomEvent('storybook:updated',{detail:{count:cards.length}}));
+    return cards;
   }
 
+  let inFlight=null;
   async function refresh(){
-    const bridge=window.QuantaCloudConnection||window.StarQuestCloudLedger;
-    if(!bridge?.authenticatedFetch){window.dispatchEvent(new CustomEvent('newsphi:quanta-cloud-error',{detail:{reason:'signed_out'}}));return {ok:false,reason:'signed_out'};}
-    const response=await bridge.authenticatedFetch(ENDPOINT,{cache:'no-store'});
-    const payload=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(payload.error||'quanta_collect_feed_failed');
-    const cards=(Array.isArray(payload.cards)?payload.cards:[]).map(normalize).filter(Boolean);
-    merge(cards);
-    return {ok:true,count:cards.length};
+    if(inFlight)return inFlight;
+    inFlight=(async()=>{
+      const bridge=window.QuantaCloudConnection||window.StarQuestCloudLedger;
+      if(typeof bridge?.authenticatedFetch!=='function'){
+        window.dispatchEvent(new CustomEvent('newsphi:quanta-cloud-error',{detail:{reason:'signed_out'}}));
+        return {ok:false,reason:'signed_out',cached:read(CACHE,[]).length};
+      }
+      const found=new Map();
+      let offset=0,pages=0,hasMore=true;
+      while(hasMore&&pages<30){
+        const url=ENDPOINT+'?limit=200&offset='+offset;
+        const response=await bridge.authenticatedFetch(url,{cache:'no-store'});
+        const payload=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(payload.error||'quanta_collect_feed_failed');
+        const batch=(Array.isArray(payload.cards)?payload.cards:[]).map(normalize).filter(Boolean);
+        for(const card of batch)found.set(card.storyKey,card);
+        pages++;
+        const next=Number(payload.nextOffset);
+        if(Number.isSafeInteger(next)&&next>offset){offset=next;hasMore=true}
+        else if(payload.nextOffset===null||payload.nextOffset===undefined){
+          // Compatible with the old 50-card endpoint until the ledger pagination deploys.
+          hasMore=payload.hasMore===true&&batch.length>0;
+          offset+=batch.length;
+        }else hasMore=false;
+        if(!batch.length)hasMore=false;
+        if(found.size>=6000)break;
+      }
+      const cards=merge([...found.values()]);
+      return {ok:true,count:cards.length,received:found.size,pages};
+    })().finally(()=>{inFlight=null});
+    return inFlight;
   }
 
   function schedule(){
@@ -74,7 +114,7 @@
     setInterval(()=>refresh().catch(()=>{}),REFRESH_MS);
   }
 
-  window.NewsPhiQuantaCloud={refresh,cacheKey:CACHE,endpoint:ENDPOINT};
+  window.NewsPhiQuantaCloud={refresh,cacheKey:CACHE,endpoint:ENDPOINT,getCached:()=>read(CACHE,[])};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});
   else schedule();
 })();
