@@ -37,7 +37,7 @@ function filtered(){
  let out=cards.filter(x=>(!chapter||(meta[x._key]?.chapter||'Unsorted')===chapter)&&
   (!term||[x.title,x.body,x.sourceUrl,meta[x._key]?.chapter,meta[x._key]?.note].some(v=>String(v||'').toLowerCase().includes(term))));
  if(order==='az')out.sort((a,b)=>a.title.localeCompare(b.title));
- else out.sort((a,b)=>(Date.parse(b.collectedAt)||0)-(Date.parse(a.collectedAt)||0)*(order==='recent'?1:1));
+ else out.sort((a,b)=>(Date.parse(b.collectedAt)||0)-(Date.parse(a.collectedAt)||0));
  if(order==='oldest')out.reverse();
  return out;
 }
