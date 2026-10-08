@@ -48,10 +48,12 @@
     const byStory=new Map();
     for(const card of [...(Array.isArray(prior)?prior:[]),...incoming]){
       if(!card?.storyKey)continue;
-      const old=byStory.get(card.storyKey);
-      byStory.set(card.storyKey,old?{...old,...card,
+      const canonicalKey=String(card.storyKey).replace(/^quanta-cloud:/,'collect:');
+      const candidate={...card,storyKey:canonicalKey,id:canonicalKey};
+      const old=byStory.get(canonicalKey);
+      byStory.set(canonicalKey,old?{...old,...candidate,
         collectedAt:old.collectedAt||card.collectedAt,
-        extract:card.body||card.extract||old.body||old.extract}:card);
+        extract:candidate.body||candidate.extract||old.body||old.extract}:candidate);
     }
     const cards=[...byStory.values()].sort((a,b)=>String(b.collectedAt||'').localeCompare(String(a.collectedAt||'')));
     // The complete cloud ledger remains authoritative; browser copies are a read cache.
