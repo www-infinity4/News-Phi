@@ -80,7 +80,15 @@ async function refresh(force=false){
   updateStatus('loading',{message:'Cloudflare is retrieving dated source articles…'});
   try{
    const payload=await getCloud(force);
-   let source=list(payload.articles),related=[];
+   const source=list(payload.articles);
+   // Render the current Cloudflare feed immediately. Personal-topic refinement
+   // must never hold back verified public headlines on a slow wallet connection.
+   save(CARDS,source);
+   updateStatus(source.length?'fresh':'loading',{added:source.length,
+     message:source.length?'Cloudflare · '+source.length+' verified, dated headlines':
+       'Cloudflare returned no current headlines; checking recent Quant subjects…'});
+   emit();
+   let related=[];
    // Interest tokens steer what the Cloudflare service searches; no browser
    // news searching or imported collection artifacts are used as headlines.
    const topics=await getQuantTopics();
