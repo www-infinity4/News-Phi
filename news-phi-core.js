@@ -511,7 +511,6 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     return {
       ...previous,
       storyVersion:2,
-      pinnedCollection:Boolean(card.pinnedCollection||previous.pinnedCollection),
       storyKey:keyOf(card),
       title:headline,
       headline,
@@ -536,7 +535,6 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
 
   function isVisibleCard(card){
     if(!card)return false;
-    if(card.type==='collect'||card.ingestType==='quanta-cloud-collect'||card.pinnedCollection)return Boolean(clean(card.title));
     if((card.generatedBy==='news-phi-interest-bridge'||card.ingestType)&&!card.sourceBacked)return false;
     if(card.kind==='share'&&!card.sourceBacked)return false;
     return Boolean(clean(card.title)&&clean(card.extract||card.body));
@@ -550,38 +548,23 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     const hiddenStories=get('newsPhi:hiddenStories:v1',{});
     const monitor=get('newsPhi:monitorCards:v1',[]).filter(card=>!hiddenStories[card.storyKey||card.url||card.id]);
     const quanta=get('newsPhi:quantaCloudCards:v1',[]);
-    const localQuanta=get('quantaPhiCollected',[]).map(card=>({
-      id:'collect:'+card.key,storyKey:'collect:'+card.key,title:card.title,
-      extract:card.story||('Collected from QuantaPhi: '+card.title),
-      body:card.story||'',url:card.sourceUrl||'',image:card.type==='Image'?card.media:'',
-      imageVerified:card.type==='Image',sourceBacked:Boolean(card.sourceUrl),
-      collectedAt:card.collectedAt,domain:'QuantaPhi',type:'collect',pinnedCollection:true
-    }));
-    // News remains a living feed; collected cards are independent permanent records.
-    // Browser storage is origin-specific: cross-origin QuantaPhi items enter via
-    // the authenticated cloud bridge, not the News Phi localStorage namespace.
-    const collected=[...quanta,...localQuanta,...shared,
-      ...(Array.isArray(profile.collected)?profile.collected:[])].map(card=>({
-        ...card,pinnedCollection:true,
-        storyKey:card.storyKey||card.id||card.key||keyOf(card),
-        extract:card.extract||card.story||card.body||('Collected: '+(card.title||'Untitled')),
-        collectedAt:card.collectedAt||card.createdAt||new Date().toISOString(),
-        type:'collect'
-      })).filter(isVisibleCard);
-    const all=[...monitor.filter(card=>card&&card.sourceBacked).filter(isVisibleCard),...collected];
+    const localQuanta=get('quantaPhiCollected',[]).map(card=>({id:'quanta:'+card.key,storyKey:'quanta:'+card.key,title:card.title,extract:card.story,url:card.sourceUrl,image:card.type==='Image'?card.media:'',imageVerified:card.type==='Image',sourceBacked:Boolean(card.sourceUrl),collectedAt:card.collectedAt,domain:'QuantaPhi'}));
+    const all=monitor.filter(card=>card&&card.sourceBacked).filter(isVisibleCard);
     const merged=new Map();
-    for(const card of all){
-      const key=keyOf(card);
-      const existing=merged.get(key)||{};
-      const original=card.pinnedCollection?card:existing;
-      merged.set(key,{...existing,...card,storyKey:key,
-        pinnedCollection:Boolean(existing.pinnedCollection||card.pinnedCollection),
-        // A duplicate refresh must not overwrite the earliest collection timestamp.
-        collectedAt:original.collectedAt||existing.collectedAt||card.collectedAt,
-        searchQuery:card.searchQuery||existing.searchQuery||research?.query||''});
-    }
 
-    const ordered=[...merged.values()].sort((a,b)=>Number(Boolean(b.pinnedCollection))-Number(Boolean(a.pinnedCollection))||Number(Boolean(b.isNew))-Number(Boolean(a.isNew))||(Date.parse(b.collectedAt||b.publishedAt)||0)-(Date.parse(a.collectedAt||a.publishedAt)||0)||(b.rank||0)-(a.rank||0));
+    all.forEach(card=>{
+      const key=keyOf(card);
+      const enriched=currentSources.get(key)||{};
+      const previous=merged.get(key)||{};
+      merged.set(key,{
+        ...previous,...card,...enriched,
+        storyKey:key,
+        searchQuery:card.searchQuery||previous.searchQuery||research?.query||'',
+        collectedAt:card.collectedAt||previous.collectedAt||new Date().toISOString()
+      });
+    });
+
+    const ordered=[...merged.values()].sort((a,b)=>Number(Boolean(b.isNew))-Number(Boolean(a.isNew))||(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)||(b.rank||0)-(a.rank||0));
     const readStories=get('newsPhi:readStories:v1',{});
     const fresh=ordered.filter(c=>c.isNew),older=ordered.filter(c=>!c.isNew&&!readStories[keyOf(c)]),read=ordered.filter(c=>!c.isNew&&readStories[keyOf(c)]),cards=[];
     while(fresh.length||older.length){cards.push(...fresh.splice(0,3));if(older.length)cards.push(older.shift());}
@@ -593,7 +576,7 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
       storyIndex[key]=makeBaseStory(card,storyIndex[key]||{});
     });
     set(KEYS.stories,storyIndex);
-    return {cards,storyIndex,collectedCount:ordered.filter(x=>x.pinnedCollection).length};
+    return {cards,storyIndex};
   }
 
   async function wikiSearch(query){
@@ -793,7 +776,7 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
       const story=state.storyIndex[keyOf(card)];
       return `${story?.headline||card.title||''} ${story?.standfirst||card.extract||''} ${story?.similarQuery||card.searchQuery||''}`.toLowerCase().includes(term);
     });
-    if(count)count.textContent=`${cards.length} stories · ${state.collectedCount||0} collected`;
+    if(count)count.textContent=`${cards.length} stor${cards.length===1?'y':'ies'}`;
     const status=get('newsPhi:monitorStatus:v1',{});
     syncLabel.textContent=status.state==='loading'?'Checking current reporting…':status.state==='error'?'News retrieval unavailable · saved feed retained':status.retrievedAt?`${status.added||0} new · checked ${new Date(status.retrievedAt).toLocaleTimeString()}`:`${state.cards.length} sourced stories`;
     if(!cards.length){
@@ -802,7 +785,7 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     }
     feed.innerHTML=cards.map(card=>{
       const story=state.storyIndex[keyOf(card)];
-      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${story.pinnedCollection?'YOUR COLLECTION':kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a class="story-search infinity" data-handoff-target="infinity" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'infinity')}">Build in Infinity Phi</a><a class="story-search omni" data-handoff-target="omni" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'omni')}">Explore in Omni Phi</a><a class="story-search quanta" data-handoff-target="quanta" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'quanta')}">Learn in QuantaPhi</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}" aria-label="Dismiss story" title="Show fewer stories like this">×</button></div></div></div></article>`;
+      return `<article data-news-subject="${esc(story.searchQuery)}" class="news-card${story.enriching?' is-enriching':''}" data-story-card="${esc(story.storyKey)}"><div class="card-grid">${story.image?`<img class="card-image" src="${esc(story.image)}" alt="" loading="lazy">`:`<div class="card-image fallback"><span>φ</span></div>`}<div class="card-body"><div class="card-meta"><span>${kindLabel(story.kind)}</span><span>${esc(story.domain)}</span>${story.publishedLabel?`<time>${esc(story.publishedLabel)}</time>`:""}</div><h2>${esc(story.headline)}</h2><p class="card-excerpt">${esc(excerpt(story))}</p><div class="card-actions"><button class="full" type="button" data-story="${esc(story.storyKey)}">Read story</button><a class="story-search infinity" data-handoff-target="infinity" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'infinity')}">Build in Infinity Phi</a><a class="story-search omni" data-handoff-target="omni" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'omni')}">Explore in Omni Phi</a><a class="story-search quanta" data-handoff-target="quanta" data-story-key="${esc(story.storyKey)}" href="${storySearchUrl(story,'quanta')}">Learn in QuantaPhi</a><button class="share-card" type="button" data-share="${esc(story.storyKey)}">Share story · +1/10 ⭐</button><button type="button" class="hide-story" data-hide="${esc(story.storyKey)}" aria-label="Dismiss story" title="Show fewer stories like this">×</button></div></div></div></article>`;
     }).join('');
     feed.querySelectorAll('[data-story]').forEach(button=>button.addEventListener('click',()=>openStory(button.dataset.story)));
     feed.querySelectorAll('[data-share]').forEach(button=>button.addEventListener('click',()=>shareStory(button.dataset.share)));
