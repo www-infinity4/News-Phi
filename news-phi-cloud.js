@@ -123,6 +123,44 @@ const stack=(stored,found)=>{
 async function requestTopic(topic){
  const rows=await getRelated([topic]);return list(rows);
 }
+
+window.addEventListener('newsphi:story-opened',event=>{
+ const story=event.detail||{},url=canonicalUrl(story.url);
+ if(!url)return;
+ const dialog=document.getElementById('storyDialog');
+ const body=dialog?.querySelector('.story-full');
+ const actions=body?.querySelector('.card-actions');
+ if(!actions||actions.querySelector('[data-cloud-read]'))return;
+ const button=document.createElement('button');
+ button.type='button';button.dataset.cloudRead='1';
+ button.textContent='Read more · Oracle research';button.className='full';
+ actions.append(button);
+ const explain=document.createElement('span');explain.className='oracle-source-note';
+ explain.textContent='Optional source-grounded GPT summary from the publisher · original link remains available';
+ actions.append(explain);
+ button.addEventListener('click',async()=>{
+  button.disabled=true;button.textContent='Cloudflare is reading the source…';
+  const panel=document.createElement('section');panel.className='oracle-research';
+  const header=document.createElement('h3');header.textContent='Oracle · Source-backed context';panel.append(header);
+  try{
+   const response=await fetch(API+'/read',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({url}),cache:'no-store',signal:AbortSignal.timeout(23000)});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok||!data.ok)throw new Error(data.error||'Publisher reading unavailable');
+   if(Array.isArray(data.paragraphs)&&data.paragraphs.length){
+    for(const p of data.paragraphs){const line=document.createElement('p');line.textContent=clean(p,1200);panel.append(line)}
+    const source=document.createElement('a');source.href=url;source.rel='noopener noreferrer';source.target='_blank';
+    source.textContent='Verify at '+new URL(url).hostname+' ↗';panel.append(source);
+   }else{
+    const note=document.createElement('p');note.textContent=data.note||'Publisher text not available; use the original link.';
+    panel.append(note);
+   }
+  }catch(error){
+   const warning=document.createElement('p');warning.textContent='No cloud research available for this article. The original publisher is linked above.';panel.append(warning);
+  }
+  body.append(panel);button.textContent='Oracle research checked';
+ });
+});
 window.NewsPhiDirect={
  refresh,hide:hideStory,topics:()=>[],requestTopic,stack,canonicalUrl,
  cardKey:c=>c.storyKey||c.url,setMode:()=>{},applyPolicy:()=>{},
