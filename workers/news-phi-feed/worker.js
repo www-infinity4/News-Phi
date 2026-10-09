@@ -2,11 +2,11 @@
 const AGE_MS=48*3600000, REFRESH_MS=20*60000, MAX_ARTICLES=120;
 const DEFAULT_QUERIES=['science discovery','space NASA','technology research','music recording history','business economy','world news','environment energy','medical research'];
 const FEEDS=[
-  'https://feeds.bbci.co.uk/news/rss.xml',
-  'https://feeds.bbci.co.uk/news/technology/rss.xml',
-  'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',
-  'https://feeds.npr.org/1001/rss.xml',
-  'https://www.nasa.gov/news-release/feed/'
+  {url:'https://feeds.bbci.co.uk/news/rss.xml',topic:'World news'},
+  {url:'https://feeds.bbci.co.uk/news/technology/rss.xml',topic:'Technology'},
+  {url:'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',topic:'Science & environment'},
+  {url:'https://feeds.npr.org/1001/rss.xml',topic:'NPR reporting'},
+  {url:'https://www.nasa.gov/news-release/feed/',topic:'Space & discovery'}
 ];
 const HOSTS=[
  'bbc.com','bbc.co.uk','npr.org','apnews.com','reuters.com','pbs.org',
@@ -77,13 +77,19 @@ async function liveRows(topics,withFeeds=false){
   return results.filter(x=>x.status==='fulfilled').flatMap(x=>x.value.map(item=>normalize(item,topic,'SearXNG')).filter(Boolean));
  }));
  const rows=outcomes.filter(x=>x.status==='fulfilled').flatMap(x=>x.value);
+ // A user's Quant is a search constraint, not permission to show unrelated news.
+ const matchingTopic=row=>topics.some(topic=>{
+  const q=clean(topic,85).toLowerCase(),hay=(row.title+' '+row.extract).toLowerCase();
+  const words=q.split(/\s+/).filter(w=>w.length>=4&&!/^(what|when|about|with|from|today|latest|news|into|your|this)$/.test(w));
+  return words.length?words.some(w=>hay.includes(w)):q.length>=4&&hay.includes(q);
+ });
  let rssError='';
  if(withFeeds || !rows.length){
-  const rss=await Promise.allSettled(FEEDS.map(async url=>{
-   const r=await fetch(url,{headers:{accept:'application/rss+xml,application/xml,text/xml'},cache:'no-store',signal:AbortSignal.timeout(11000)});
+  const rss=await Promise.allSettled(FEEDS.map(async feed=>{
+   const r=await fetch(feed.url,{headers:{accept:'application/rss+xml,application/xml,text/xml'},cache:'no-store',signal:AbortSignal.timeout(11000)});
    if(!r.ok)throw new Error('RSS '+r.status);
    const xml=await r.text();if(!xml.includes('<rss')&&!xml.includes('<item'))throw new Error('RSS invalid');
-   return rssStories(xml,'Current reporting').map(x=>normalize(x,'Current reporting','RSS')).filter(Boolean);
+   return rssStories(xml,feed.topic).map(x=>normalize(x,feed.topic,'RSS')).filter(Boolean).filter(x=>withFeeds||matchingTopic(x));
   }));
   rows.push(...rss.filter(x=>x.status==='fulfilled').flatMap(x=>x.value));
   rssError=rss.every(x=>x.status==='rejected')?'RSS upstream unavailable':'';
