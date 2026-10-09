@@ -170,8 +170,8 @@
       quantWhy:story.why||null
     })).filter(card=>card.title&&card.url);
     const now=Date.now(),direct=window.NewsPhiDirect;
-    const dated=stories.map(card=>direct?.normalize?{...direct.normalize({title:card.title,url:card.url,content:card.extract,publishedDate:card.publishedAt,image:card.image},card.searchQuery,now),quantWhy:card.quantWhy}:card).filter(card=>card?.title&&card.publishedAt&&Date.parse(card.publishedAt)<=now+300000&&now-Date.parse(card.publishedAt)<=7*86400000);
-    const stored=read(MONITOR_CARDS,[]),result=direct?.stack?direct.stack(stored,[dated],now):{cards:dated.length?dated:stored,added:dated.length};
+    const dated=stories.filter(card=>!/(?:porn|pornography|xxx|hardcore|onlyfans|explicit\\s+sex)/i.test([card.title,card.extract,card.url].join(' '))).map(card=>direct?.normalize?{...direct.normalize({title:card.title,url:card.url,content:card.extract,publishedDate:card.publishedAt,image:card.image},card.searchQuery,now),quantWhy:card.quantWhy}:card).filter(card=>card?.title&&card.publishedAt&&Date.parse(card.publishedAt)<=now+300000&&now-Date.parse(card.publishedAt)<=48*3600000);
+    const stored=read(MONITOR_CARDS,[]),result=direct?.stack?direct.stack(stored,[dated],now):{cards:dated,added:dated.length};
     write(MONITOR_CARDS,result.cards);
     write(MONITOR_STATUS,{state:result.added?'fresh':result.cards.length?'no-new':'empty',retrievedAt:clean(payload?.generatedAt)||new Date().toISOString(),count:result.cards.length,added:result.added,source:'Monitor / SearXNG',seeds:(payload?.seeds||[]).length});
     return result.cards;
