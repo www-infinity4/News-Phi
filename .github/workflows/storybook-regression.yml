@@ -1,18 +1,19 @@
-name: News Phi collected Storybook
+name: News Phi fresh-news regressions
 on:
   push:
     branches: [main]
   pull_request:
 jobs:
-  storybook:
+  news-freshness:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: |
+      - name: Verify news-only stream, freshness and safety
+        run: |
           node --check news-phi-core.js
           node --check news-phi-bridges.js
-          node --check storybook.js
+          node --check monitor-refresh-loop.js
           node --test test/storybook-collections.test.cjs
