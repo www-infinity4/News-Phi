@@ -1,0 +1,67 @@
+/* Infinity Oracle design system — the My Storybook aesthetic for News Phi. */
+:root{color-scheme:dark;--bg:#10141d;--ink:#f4f4ed;--muted:#a4adbd;--orange:#d2ef91;--gold:#d2ef91;--violet:#baa8ef;--panel:#191e29}
+html{background:#10141d;scroll-behavior:auto}
+body{background:#10141d;color:#f4f4ed}
+body::before{display:none}
+.oracle-header{position:relative;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;min-height:100px;padding:15px max(18px,calc((100% - 1270px)/2));background:#10141d;border-bottom:1px solid #303644;backdrop-filter:none;gap:12px}
+.oracle-header .brand{font-size:22px;font-weight:800;letter-spacing:-.6px;gap:12px}
+.oracle-header .brand .oracle-mark{width:44px;height:44px;border:0;border-radius:13px;background:#d2ef91;box-shadow:none;color:#152015;font:italic 36px Georgia,serif;display:grid;place-items:center}
+.oracle-brand{line-height:1.2;color:#f4f4ed}
+.oracle-brand small{display:block;font-size:8px;letter-spacing:1.85px;color:#a4adbd;margin-top:5px;font-weight:700}
+.oracle-nav{display:flex;align-items:center;gap:20px;font-size:12px;color:#bfc4d0;flex-wrap:wrap}.oracle-nav a{color:inherit;text-decoration:none}.oracle-nav a:hover{color:#d2ef91}
+.oracle-header .sync-state{justify-self:auto;font-size:11px;color:#a4adbd;max-width:300px}
+.oracle-header .sync-state i{background:#d2ef91;box-shadow:0 0 10px #d2ef9177}
+.shell{width:min(1260px,calc(100% - 34px));padding-bottom:70px}
+.oracle-hero{padding:48px 4px 52px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(220px,.85fr);align-items:center;gap:clamp(20px,5vw,65px)}
+.eyebrow{font-size:10px;letter-spacing:1.75px;color:#a4adbd;font-weight:750}
+.green-dot{display:inline-block;width:8px;height:8px;background:#d2ef91;border-radius:50%;margin-right:9px;box-shadow:0 0 15px #d2ef9188}
+.oracle-hero h1{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:clamp(40px,5.5vw,70px);font-weight:550;letter-spacing:-2.5px;line-height:1.08;margin:15px 0 20px}
+.oracle-hero h1 em{font-family:Georgia,serif;font-weight:400;color:#d2ef91}
+.oracle-hero .intro{max-width:600px;color:#a4adbd;font-size:14px;line-height:1.85}
+.oracle-status{display:flex;align-items:center;gap:15px;flex-wrap:wrap;margin-top:25px}
+#newsCloudStatus{font-size:11px;color:#c8ccd3}
+.refresh{min-height:42px;border-radius:9px;padding:10px 16px;background:#d2ef91;color:#1c2519;border:1px solid #d2ef91;cursor:pointer;font-weight:750}
+.refresh:focus-visible{outline:2px solid #baa8ef;outline-offset:3px}
+.oracle-art{height:310px;position:relative;overflow:hidden;border-radius:17px;border:1px solid #494451;background:radial-gradient(ellipse at center,#574d70 0,#302e40 43%,#222431 78%)}
+.oracle-art::before{content:"";position:absolute;inset:0;background-image:linear-gradient(#9a93af11 1px,transparent 1px),linear-gradient(90deg,#9a93af11 1px,transparent 1px);background-size:35px 35px}
+.news-orbit{position:absolute;top:50%;left:50%;border-radius:50%;border:1px solid #c9b9e266;transform:translate(-50%,-50%) rotate(-28deg)}
+.orb-one{width:225px;height:225px}.orb-two{width:315px;height:150px}.orb-three{width:277px;height:277px;border-style:dashed;opacity:.6}
+.news-art-core{position:absolute;width:104px;height:104px;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle at 30% 25%,#e0d2f4,#9780b8 70%);color:#272038;font:italic 100px Georgia,serif;box-shadow:0 0 70px #b6a0cf55}
+.oracle-art small{position:absolute;bottom:20px;left:24px;letter-spacing:1.7px;color:#dfd7eb;font-size:9px}
+.desk-panel{border-top:1px solid #303644;padding-top:32px}
+.feed-title{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;flex-wrap:wrap;margin-bottom:23px}
+.feed-title h2{font-size:24px;font-weight:550;letter-spacing:-.5px;margin:0}
+.feed-title .card-count{color:#d2ef91;font:12px ui-monospace,monospace}
+.feed-tools{position:static;background:none;flex-wrap:wrap;margin:0 0 9px}
+.feed-search{flex:1;max-width:720px;min-height:48px;background:#191e29;border:1px solid #303644;border-radius:11px;box-shadow:none;grid-template-columns:22px 1fr;gap:11px}
+.feed-search input{color:#f4f4ed;font-size:14px}
+.feed-search span{color:#baa8ef;font-size:24px}
+.cloud-verify{color:#9099a8;font-size:10px;letter-spacing:1px;font-weight:700}
+.source-policy{font-size:11px;line-height:1.6;color:#9fa9b7;margin:0 0 22px}
+.feed{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.news-card{background:linear-gradient(145deg,#202632,#171d29);border:1px solid #353e4b;border-radius:17px;box-shadow:none}
+.news-card:hover{border-color:#7f7399}
+.card-grid{display:flex;flex-direction:column;height:100%}
+.card-image.fallback{min-height:115px;height:115px;background:radial-gradient(ellipse at center,#45425c,#222431 70%);border-bottom:1px solid #393f4e}
+.card-image.fallback span{color:#d1bff1;text-shadow:none;font:italic 72px Georgia,serif}
+.card-image:not(.fallback){height:115px;min-height:115px;object-fit:cover}
+.card-body{padding:20px;display:flex;flex-direction:column;flex:1}
+.card-meta{color:#baa8ef;letter-spacing:.06em;font-size:10px}
+.card-meta span+span::before{color:#6c7180}
+.card-body h2{font:600 19px/1.35 Inter,ui-sans-serif,system-ui,sans-serif;letter-spacing:-.3px;margin:9px 0}
+.card-excerpt{color:#bfc6d1;font-size:13px;line-height:1.7;flex:1}
+.card-actions{margin-top:22px;gap:7px}
+.card-actions button,.card-actions a{border-radius:10px;background:#2b3240;border:1px solid #535a67;color:#f4f4ed;font-size:11px;padding:10px 12px;min-height:39px}
+.card-actions .full{background:#d2ef91;color:#172018;border-color:#d2ef91}
+.card-actions .share-card{background:#2b3240;color:#f4f4ed;border:1px solid #535a67}
+.card-actions .hide-story{border-radius:50%;background:#151a23;color:#bfc6d1;padding:6px;min-height:31px;min-width:31px}
+.empty-feed,.loading-card{grid-column:1/-1;background:#191e29;border:1px dashed #515767;border-radius:17px;color:#bfc6d1;min-height:180px}
+.story-dialog{background:#191e29;border:1px solid #7d748c;border-radius:20px}
+.story-dialog .story-full h2{font-family:Inter,system-ui,sans-serif;font-weight:550}
+.story-dialog .dialog-close{background:#d2ef91;color:#172018;border-radius:10px}
+.story-full{padding:clamp(22px,5vw,42px)}.story-sources{background:#202632;border:1px solid #353e4b}
+.story-sources a{color:#d2ef91}
+@media(max-width:760px){.oracle-header{padding:12px 16px}.oracle-header .sync-state{display:none}.oracle-hero{grid-template-columns:1fr;padding:28px 2px}.oracle-hero h1{font-size:clamp(38px,9vw,55px)}.oracle-art{height:200px}.orb-one{width:155px;height:155px}.orb-two{width:230px;height:100px}.orb-three{width:180px;height:180px}.news-art-core{height:74px;width:74px;font-size:71px}.feed{grid-template-columns:1fr}.feed-search{width:100%}.card-image.fallback{height:100px;min-height:100px}.card-body{padding:19px}.card-body h2{font-size:20px}.source-policy{margin-top:9px}.oracle-nav{gap:12px;font-size:11px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.oracle-source-note{font-size:10px;color:#a4adbd;line-height:1.5;max-width:340px;align-self:center}.oracle-research{margin-top:24px;padding:22px;border:1px solid #4d596b;background:#202632;border-radius:15px}.oracle-research h3{color:#d2ef91;font-size:12px;letter-spacing:1.3px;text-transform:uppercase}.oracle-research p{font-size:15px;color:#dee2e9;line-height:1.8}.oracle-research a{color:#d2ef91;font-size:13px}
