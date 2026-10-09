@@ -546,7 +546,17 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     const research=get(KEYS.omniResearch,null);
     const currentSources=new Map((research?.sources||[]).map(card=>[keyOf(card),card]));
     const hiddenStories=get('newsPhi:hiddenStories:v1',{});
-    const monitor=get('newsPhi:monitorCards:v1',[]).filter(card=>!hiddenStories[card.storyKey||card.url||card.id]);
+    // News Phi is NEWS, never the saved-Quant archive. Old reporting expires on
+    // the screen even if all upstream network feeds temporarily fail.
+    const ageLimit=48*60*60*1000,now=Date.now();
+    const unsafe=/\b(?:porn|pornography|xxx|hardcore|explicit\s+sex|adult\s+video|onlyfans|nude\s+leak|escort\s+service|sex\s+tape)\b/i;
+    const monitor=get('newsPhi:monitorCards:v1',[]).filter(card=>{
+      if(hiddenStories[card.storyKey||card.url||card.id])return false;
+      const when=Date.parse(card.publishedAt||'');
+      if(!Number.isFinite(when)||when>now+300000||now-when>ageLimit)return false;
+      if(unsafe.test([card.title,card.extract,card.domain,card.url].join(' ')))return false;
+      return Boolean(card.url&&/^https?:\/\//.test(card.url));
+    });
     const quanta=get('newsPhi:quantaCloudCards:v1',[]);
     const localQuanta=get('quantaPhiCollected',[]).map(card=>({id:'quanta:'+card.key,storyKey:'quanta:'+card.key,title:card.title,extract:card.story,url:card.sourceUrl,image:card.type==='Image'?card.media:'',imageVerified:card.type==='Image',sourceBacked:Boolean(card.sourceUrl),collectedAt:card.collectedAt,domain:'QuantaPhi'}));
     const all=monitor.filter(card=>card&&card.sourceBacked).filter(isVisibleCard);
