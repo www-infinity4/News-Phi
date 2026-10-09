@@ -4,7 +4,7 @@
   const CARDS='newsPhi:monitorCards:v1',STATUS='newsPhi:monitorStatus:v1',INDEX='newsPhi:subjectIndex:v1';
   const SOURCES=['infinityPhi:searchTokens:v1','omniPhi:history:v1','quantaPhiBuildHistoryV1','quantaPhiCollected','phiShared:collection:v1','controlPhi:shareFeed:v1','phiShared:interestSignals:v1','newsPhi:retrievalQueue:v2','newsPhi:cloudSubjects:v1'];
   const ARTICLE_MAX_AGE=48*60*60*1000, TOPIC_MAX_AGE=30*86400000;
-  const UNSAFE=/(?:\\b(?:porn|xxx|hardcore|explicit\\s+sex|adult\\s+video|onlyfans|nude\\s+leak|escort\\s+service|sex\\s+tape)\\b)/i;
+  const UNSAFE=/\b(?:porn|pornography|xxx|hardcore|explicit\s+sex|adult\s+video|onlyfans|nude\s+leak|escort\s+service|sex\s+tape)\b/i;
   const unsafe=card=>UNSAFE.test([card?.title,card?.extract,card?.domain,card?.url].join(' '));
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
   const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}};
