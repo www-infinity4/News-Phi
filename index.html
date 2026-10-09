@@ -1,53 +1,46 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>News Phi — Collected Intelligence</title>
-  <meta name="description" content="A living feed built from Infinity Phi cards plus the programs, searches, tracked clicks, and completed shares you choose across the Infinity network." />
-  <meta name="theme-color" content="#080515" />
-  <link rel="canonical" href="https://www-infinity4.github.io/News-Phi/" />
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="News Phi — Collected Intelligence" />
-  <meta property="og:description" content="Your selected cards, program views, searches, tracked share-link clicks, and completed shares become reusable news and research paths." />
-  <meta property="og:url" content="https://www-infinity4.github.io/News-Phi/" />
-  <meta name="twitter:card" content="summary" />
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css" />
-  <style>html{scroll-behavior:auto!important}</style>
-<style>.news-card{position:relative}.hide-story{position:absolute;right:8px;top:8px;min-width:36px;min-height:36px;font-size:20px;z-index:2}.card-meta{padding-right:28px}</style></head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="./" aria-label="News Phi home"><strong>NEWS</strong><span>φ</span></a>
-    <div class="sync-state"><i></i><span id="syncLabel">Reading shared cards</span></div>
-  </header>
-
-  <main class="shell">
-    <section class="feed-head">
-      <p class="eyebrow">Infinity Phi collected intelligence</p>
-      <h1>Your interests,<br><em>flowing forward.</em></h1>
-      <p class="intro">News Phi grows from what you actually explore. Tapping a program records a view signal, searches add subjects you want to investigate, tracked links record what you actually followed, and completed shares count as the strongest signal. News Phi turns those choices into reusable story cards and brings repeated interests back toward the top, giving you an educational feed shaped by your own viewing and research instead of a generic list.</p>
-    </section>
-
-<section class="feed" id="feed" aria-live="polite">
-      <div class="loading-card">Synchronizing collected cards…</div>
-    </section>
-  </main>
-
-  <dialog class="story-dialog" id="storyDialog">
-    <button class="dialog-close" id="closeStory" type="button" aria-label="Close full card">×</button>
-    <article id="storyContent"></article>
-  </dialog>
-
-  <script src="tracking.js?v=20260913-click1"></script>
-  <script src="https://www-infinity4.github.io/Control-Phi/control-phi.js?v=20260914-wallet1" onerror="this.onerror=null;this.src='https://www-infinity4.github.io/News-Phi/control-phi.js?v=20260914-wallet1'"></script>
-  <script src="https://www-infinity4.github.io/TV-Database/js/auth.js?v=20260929-news1"></script>
-  <script>window.STARQUEST_LEDGER_CONFIG=window.STARQUEST_LEDGER_CONFIG||{endpoint:"https://starquest-ledger.marvaseater.workers.dev"};</script>
-  <script src="https://www-infinity4.github.io/TV-Database/js/starquest-cloud-ledger.js?v=20260929-news2"></script>
-<script src="news-phi-core.js?v=20261008-news-only7"></script>
-  <script src="https://www-infinity4.github.io/QuantaPhi/cloud-wallet-client.js?v=20261003-device-recovery3"></script>
-<script src="news-phi-bridges.js?v=20261008-safe-monitor7"></script>
-  <script src="monitor-refresh-loop.js?v=20261008-fresh-news7"></script>
-<script src="news-phi-extras.js?v=20261004-merge1"></script>
-</body>
-</html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>News Phi · Infinity Oracle</title>
+<meta name="description" content="Fresh source-backed reporting served from the News Phi Cloudflare news desk, researched from current headlines and your recent Quant interests.">
+<meta name="theme-color" content="#10141d">
+<link rel="canonical" href="https://quantaphi.org/news-phi/">
+<meta property="og:type" content="website"><meta property="og:title" content="News Phi · Infinity Oracle">
+<meta property="og:description" content="Fresh original-source headlines from the Cloudflare news desk. Never an old Quant archive.">
+<meta property="og:url" content="https://quantaphi.org/news-phi/">
+<meta name="twitter:card" content="summary">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css?v=20261008-oracle9">
+<link rel="stylesheet" href="oracle-news.css?v=20261008-oracle9">
+</head><body>
+<header class="topbar oracle-header">
+ <a class="brand" href="/news-phi/" aria-label="News Phi home"><span class="oracle-mark">φ</span><span class="oracle-brand">News Phi<small>INFINITY ORACLE · CLOUD NEWS DESK</small></span></a>
+ <nav class="oracle-nav"><a href="/">QuantaPhi</a><a href="/storybook/">My Storybook</a></nav>
+ <div class="sync-state"><i></i><span id="syncLabel">Contacting Cloudflare…</span></div>
+</header>
+<main class="shell">
+ <section class="feed-head oracle-hero">
+  <div class="oracle-intro">
+   <p class="eyebrow"><span class="green-dot"></span> CLOUD-SOURCED · DATE-VERIFIED NEWS</p>
+   <h1>Fresh stories.<br><em>Real sources.</em></h1>
+   <p class="intro">News Phi follows current reporting and the subjects your recent Quants help identify. Cloudflare retrieves the articles, verifies the publication date, and shows the original publisher behind each story. Saved collections belong in My Storybook—not in today's news.</p>
+   <div class="oracle-status"><span id="newsCloudStatus" role="status">Checking dated articles at Cloudflare…</span><button type="button" class="refresh" id="cloudRefresh">↻ Get fresh news</button></div>
+  </div>
+  <div class="oracle-art" aria-hidden="true"><span class="news-orbit orb-one"></span><span class="news-orbit orb-two"></span><span class="news-orbit orb-three"></span><span class="news-art-core">φ</span><small>ORACLE / CURRENT SIGNAL</small></div>
+ </section>
+ <section class="desk-panel" aria-label="Current headlines">
+  <div class="feed-title"><div><p class="eyebrow">THE NEWSROOM</p><h2>Current reporting</h2></div><span id="cardCount" class="card-count">0 current stories</span></div>
+  <div class="feed-tools"><label class="feed-search" for="feedSearch"><span aria-hidden="true">⌕</span><input id="feedSearch" placeholder="Find a subject in current news" autocomplete="off" type="search"></label><span class="cloud-verify">CLOUDFLARE · LAST 48 HOURS</span></div>
+  <p class="source-policy">Only news with a dated source link appears below. If the source service is unavailable, News Phi shows that status rather than recycling old news or loading collected media.</p>
+  <section class="feed" id="feed" aria-live="polite"><div class="loading-card">Checking live news publishers at Cloudflare…</div></section>
+ </section>
+</main>
+<dialog class="story-dialog" id="storyDialog"><button class="dialog-close" id="closeStory" type="button" aria-label="Close story">×</button><article id="storyContent"></article></dialog>
+<script src="tracking.js?v=20260913-click1"></script>
+<script src="https://www-infinity4.github.io/Control-Phi/control-phi.js?v=20260914-wallet1" onerror="this.onerror=null;this.src='https://www-infinity4.github.io/News-Phi/control-phi.js?v=20260914-wallet1'"></script>
+<script src="https://www-infinity4.github.io/TV-Database/js/auth.js?v=20260929-news1"></script>
+<script>window.STARQUEST_LEDGER_CONFIG=window.STARQUEST_LEDGER_CONFIG||{endpoint:"https://starquest-ledger.marvaseater.workers.dev"};</script>
+<script src="https://www-infinity4.github.io/TV-Database/js/starquest-cloud-ledger.js?v=20260929-news2"></script>
+<script src="https://www-infinity4.github.io/QuantaPhi/cloud-wallet-client.js?v=20261003-device-recovery3"></script>
+<script src="news-phi-core.js?v=20261008-oracle9"></script>
+<script src="news-phi-cloud.js?v=20261008-oracle9"></script>
+</body></html>
