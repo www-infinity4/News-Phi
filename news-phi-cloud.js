@@ -96,7 +96,7 @@ async function refresh(force=false){
    const blended=list([...related,...source]);
    save(CARDS,blended);
    updateStatus(blended.length?'fresh':'error',{added:blended.length,
-    message:blended.length?'Cloudflare · '+blended.length+' dated stories · '+(topics.length?'your recent Quant topics included':'public sources'):
+    message:blended.length?'Cloudflare · '+blended.length+' dated stories · '+(related.length?'recent Quant matches included':'verified publisher feeds'):
       'No verified recent articles from Cloudflare right now. Old headlines are not being recycled.'});
    emit();
    return {ok:true,count:blended.length,cloud:true,topics:topics.length,provider:payload.sourceStatus};
