@@ -1,0 +1,36 @@
+name: Oracle Cloud News feed
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/news-phi-feed/**'
+      - 'news-phi-cloud.js'
+      - 'oracle-news.css'
+      - 'index.html'
+      - 'test/cloud-news.test.cjs'
+      - '.github/workflows/oracle-cloud-news.yml'
+  pull_request:
+    paths:
+      - 'workers/news-phi-feed/**'
+      - 'news-phi-cloud.js'
+      - 'oracle-news.css'
+      - 'index.html'
+      - 'test/cloud-news.test.cjs'
+      - '.github/workflows/oracle-cloud-news.yml'
+jobs:
+  cloud-news:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Worker and Oracle client
+        run: |
+          node --check workers/news-phi-feed/worker.js
+          node --check news-phi-cloud.js
+          node --test test/cloud-news.test.cjs
+      - name: Check deployed Cloudflare Worker endpoint
+        run: |
+          curl --fail --location --retry 2 --connect-timeout 15 --max-time 35 https://news-phi-feed.marvaseater.workers.dev/v1/news/health -o /tmp/news-health.json
+          node -e "const d=require('/tmp/news-health.json');if(!d.ok||d.service!=='news-phi-cloud')process.exit(1);console.log('Cloudflare health verified')"
