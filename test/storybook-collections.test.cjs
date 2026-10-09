@@ -1,31 +1,34 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const file=n=>fs.readFileSync(path.join(__dirname,'..',n),'utf8');
-test('all collected stories are part of the visible News Phi feed',()=>{
- const code=file('news-phi-core.js');
- assert.ok(code.includes('...quanta,...localQuanta,...shared'));
- assert.ok(code.includes('...monitor.filter(card=>card&&card.sourceBacked).filter(isVisibleCard),...collected'));
- assert.ok(code.includes("storyKey:'collect:'+card.key"));
- assert.ok(code.includes('pinnedCollection:true'));
-});
-test('cloud bridge paginates, merges and keeps the older collection cache',()=>{
- const code=file('news-phi-bridges.js');
- assert.ok(code.includes("ENDPOINT+'?limit=200&offset='+offset"));
- assert.ok(code.includes("payload.nextOffset"));
- assert.ok(code.includes('...(Array.isArray(prior)?prior:[]),...incoming'));
- assert.ok(code.includes("replace(/^quanta-cloud:/,'collect:')"));
- assert.ok(!code.includes('write(CACHE,cards);'));
-});
-test('My Storybook has its own full reading and chapter UI',()=>{
- const html=file('storybook.html'),js=file('storybook.js');
- assert.match(html,/My <em>Storybook<\/em>/);
- for(const id of ['bookCount','bookCards','chapterFilter','bookSearch','syncButton'])assert.ok(html.includes('id="'+id+'"'));
- assert.ok(js.includes('/v1/quants/storybook'));
- assert.ok(js.includes("meta[item._key]?.chapter"));
- assert.ok(js.includes('auth.authenticatedFetch(BASE'));
- assert.ok(js.includes("imageVerified"));
-});
-test('News Phi links the new book without replacing the news feed',()=>{
- const html=file('index.html');
- assert.ok(html.includes('href="storybook.html"'));
+const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
+test('News Phi is the original news desk, not a collected-story shelf',()=>{
+ const html=read('index.html'),core=read('news-phi-core.js');
+ assert.match(html,/<title>News Phi — Collected Intelligence<\/title>/);
  assert.ok(html.includes('id="feed"'));
+ assert.ok(!html.includes('storybook-shortcut'));
+ assert.ok(core.includes("const all=monitor.filter(card=>card&&card.sourceBacked).filter(isVisibleCard);"));
+ assert.ok(!core.includes('pinnedCollection'));
+});
+test('stale train stories expire even if saved in storage and retrieval fails',()=>{
+ const core=read('news-phi-core.js'),loop=read('monitor-refresh-loop.js');
+ assert.ok(core.includes('ageLimit=48*60*60*1000'));
+ assert.ok(core.includes('now-when>ageLimit'));
+ assert.ok(loop.includes('ARTICLE_MAX_AGE=48*60*60*1000'));
+ assert.ok(loop.includes('if(!freshArticle(card,now))continue'));
+ assert.ok(loop.includes('const current=stack(stored,[]).cards'));
+});
+test('fresh news retrieval is not driven by months-old Quants',()=>{
+ const loop=read('monitor-refresh-loop.js');
+ assert.ok(loop.includes('TOPIC_MAX_AGE=30*86400000'));
+ assert.ok(loop.includes('Date.now()-timestamp>TOPIC_MAX_AGE'));
+ assert.ok(loop.includes("unseen().length>=BATCH"));
+});
+test('unwanted adult material is excluded before news cards and Monitor fallback appear',()=>{
+ for(const file of ['news-phi-core.js','monitor-refresh-loop.js','news-phi-bridges.js']){
+  assert.match(read(file),/porn|pornography/);
+ }
+});
+test('legacy Storybook link leads to separate Oracle site',()=>{
+ const html=read('storybook.html');
+ assert.match(html,/https:\/\/quantaphi\.org\/storybook\//);
+ assert.ok(!html.includes('<section class="tools">'));
 });
