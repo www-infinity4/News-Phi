@@ -819,6 +819,7 @@ window.ControlPhi=window.ControlPhi||{};window.ControlPhi.ensureShareCredit=ensu
     if(location.hash!==`#story=${encodeURIComponent(key)}`)history.replaceState(null,'',`#story=${encodeURIComponent(key)}`);
     if(!rerender)dialog.showModal();
     if(!story.enriched&&!story.enriching)void enrichStory(key);
+    if(!rerender)window.dispatchEvent(new CustomEvent('newsphi:story-opened',{detail:{storyKey:key,url:story.url,title:story.headline}}));
   }
 
   function closeStory(){
