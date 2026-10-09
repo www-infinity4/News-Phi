@@ -34,3 +34,5 @@ jobs:
         run: |
           curl --fail --location --retry 2 --connect-timeout 15 --max-time 35 https://news-phi-feed.marvaseater.workers.dev/v1/news/health -o /tmp/news-health.json
           node -e "const d=require('/tmp/news-health.json');if(!d.ok||d.service!=='news-phi-cloud')process.exit(1);console.log('Cloudflare health verified')"
+          curl --fail --location --retry 1 --connect-timeout 15 --max-time 65 https://news-phi-feed.marvaseater.workers.dev/v1/news/feed -o /tmp/news-feed.json
+          node -e "const d=require('/tmp/news-feed.json');if(!d.cloud||!Array.isArray(d.articles))process.exit(1);console.log('Cloudflare feed count:',d.articles.length,'status:',d.sourceStatus,'source:',d.source)"
