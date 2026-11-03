@@ -39,4 +39,22 @@ test('D1 stores source-grounded reports once and only returns them while source 
  assert.match(worker,/news_read_reports WHERE article_key=\?/);
  assert.match(worker,/sourceContext\(found,env\)/);
  assert.match(worker,/published_at/);
-});\ntest('thin publisher HTML cannot support invented long reporting even when AI is available',async()=>{\n const s=setup(Array.from({length:7},()=>('A detailed but ungrounded sentence. ').repeat(8)));\n s.context.fetch=async()=>new Response('<html>'+p+'</html>',{status:200,headers:{'content-type':'text/html'}});\n const result=await s.call();\n assert.equal(result.text,'');\n assert.equal(result.kind,'source_too_thin');\n});\n
+});
+test('thin publisher HTML cannot support invented long reporting even when AI is available',async()=>{
+ const s=setup(Array.from({length:7},()=>('A detailed but ungrounded sentence. ').repeat(8)));
+ s.context.fetch=async()=>new Response('<html>'+p+'</html>',{status:200,headers:{'content-type':'text/html'}});
+ const result=await s.call();
+ assert.equal(result.text,'');
+ assert.equal(result.kind,'source_too_thin');
+});
+
+ test('one blocked paragraph rejects the entire AI report without laundering it',async()=>{
+  const paragraphs=Array.from({length:7},(_,i)=>'Paragraph '+i+': '+'Detailed source interpretation and measurable observations from published research with no additional invented evidence. '.repeat(4));
+  paragraphs[3]='This output contains explicit pornographic material. '+paragraphs[3];
+  const result=await setup(paragraphs).call();
+  assert.equal(result.kind,'AI_unverified');
+  assert.equal(result.text,'');
+ });
+ test('long-form report D1 rows are bounded by retention cleanup',()=>{
+  assert.match(worker,/DELETE FROM news_read_reports WHERE generated_at </);
+ });
