@@ -12,6 +12,7 @@ on:
       - '.github/workflows/oracle-cloud-news.yml'
   pull_request:
     paths:
+      - 'test/cloud-longform.test.cjs'
       - 'workers/news-phi-feed/**'
       - 'news-phi-cloud.js'
       - 'oracle-news.css'
