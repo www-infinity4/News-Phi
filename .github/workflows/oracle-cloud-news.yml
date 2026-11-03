@@ -8,6 +8,7 @@ on:
       - 'oracle-news.css'
       - 'index.html'
       - 'test/cloud-news.test.cjs'
+      - 'test/cloud-longform.test.cjs'
       - '.github/workflows/oracle-cloud-news.yml'
   pull_request:
     paths:
@@ -29,7 +30,7 @@ jobs:
         run: |
           node --check workers/news-phi-feed/worker.js
           node --check news-phi-cloud.js
-          node --test test/cloud-news.test.cjs
+          node --test test/cloud-news.test.cjs test/cloud-longform.test.cjs
       - name: Check deployed Cloudflare Worker endpoint
         run: |
           curl --fail --location --retry 2 --connect-timeout 15 --max-time 35 https://news-phi-feed.marvaseater.workers.dev/v1/news/health -o /tmp/news-health.json
