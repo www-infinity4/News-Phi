@@ -121,6 +121,7 @@ async function refresh(db,force=false){
    await db.prepare("UPDATE news_feed_status SET last_success=?,last_count=?,last_error='' WHERE id=1").bind(now,result.rows.length).run();
   }else await db.prepare("UPDATE news_feed_status SET last_error=? WHERE id=1").bind(result.error).run();
   await db.prepare("DELETE FROM news_articles WHERE published_at < ?").bind(new Date(now-AGE_MS).toISOString()).run();
+  await db.prepare("DELETE FROM news_read_reports WHERE generated_at < ?").bind(new Date(now-2*AGE_MS).toISOString()).run();
   return {added:result.rows.length,error:result.error};
  }catch(e){
   const reason=clean(e.message,180);
@@ -175,8 +176,10 @@ async function sourceContext(article,env){
   ],max_tokens:2500,temperature:0.15});
   const raw=String(response?.response||response?.output_text||'');
   const payload=JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0]||'{}');
-  const paras=(Array.isArray(payload.paragraphs)?payload.paragraphs:[]).map(x=>clean(x,1200)).filter(x=>x.length>=180&&!BLOCK.test(x));
-  if(paras.length<6||paras.join(' ').length<1500)return {text:'',kind:'AI_unverified'};
+  const paras=(Array.isArray(payload.paragraphs)?payload.paragraphs:[]).map(x=>clean(x,1200));
+  // Reject unsafe output as a whole rather than silently laundering blocked paragraphs.
+  if(paras.some(x=>BLOCK.test(x))||paras.some(x=>x.length<180)||paras.length<6||paras.join(' ').length<1500)
+   return {text:'',kind:'AI_unverified'};
   return {text:paras.join('\n\n'),kind:'gpt-source-grounded'};
  }catch(e){return {text:'',kind:'AI_failed'}}
 }
