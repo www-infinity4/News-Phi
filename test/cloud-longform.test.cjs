@@ -6,7 +6,7 @@ const article={url:publisher,domain:'science.nasa.gov',title:'New research on st
 const p='<p>Researchers examined a verified sample of galaxies with observational evidence from several telescopes and explained the uncertainty involved in interpreting measurements over time.</p>';
 function setup(paragraphs,aiEnabled=true){
  const context=vm.createContext({Date,URL,URLSearchParams,Response,Request,AbortSignal,console,
-  fetch:async()=>new Response('<html><body>'+p.repeat(8)+'</body></html>',{status:200,headers:{'content-type':'text/html'}})});
+  fetch:async()=>new Response('<html><body>'+Array.from({length:8},(_,i)=>p.replace('Researchers examined','For finding '+i+', researchers examined')).join('')+'</body></html>',{status:200,headers:{'content-type':'text/html'}})});
  vm.runInContext(ready,context);context.article=article;
  let called=null;
  context.env={AI:aiEnabled?{run:async(_,args)=>{called=args;return {response:JSON.stringify({paragraphs})}}}:undefined};
@@ -39,4 +39,4 @@ test('D1 stores source-grounded reports once and only returns them while source 
  assert.match(worker,/news_read_reports WHERE article_key=\?/);
  assert.match(worker,/sourceContext\(found,env\)/);
  assert.match(worker,/published_at/);
-});
+});\ntest('thin publisher HTML cannot support invented long reporting even when AI is available',async()=>{\n const s=setup(Array.from({length:7},()=>('A detailed but ungrounded sentence. ').repeat(8)));\n s.context.fetch=async()=>new Response('<html>'+p+'</html>',{status:200,headers:{'content-type':'text/html'}});\n const result=await s.call();\n assert.equal(result.text,'');\n assert.equal(result.kind,'source_too_thin');\n});\n
